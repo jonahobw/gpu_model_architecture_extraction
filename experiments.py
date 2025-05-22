@@ -289,14 +289,12 @@ def deletePrunedProfiles(
     constructor = StructuredPruneModelManager if structured else PruneModelManager
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         prune_path = (
-            vict_path.parent
-            / constructor.FOLDER_NAME
-            / constructor.MODEL_FILENAME
+            vict_path.parent / constructor.FOLDER_NAME / constructor.MODEL_FILENAME
         )
         if prune_path.exists():
             prune_manager = constructor.load(model_path=prune_path)
             prune_manager.delete()
-    
+
 
 def profileAllPrunedModels(
     gpu: int = 0,
@@ -310,9 +308,7 @@ def profileAllPrunedModels(
     constructor = StructuredPruneModelManager if structured else PruneModelManager
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         prune_path = (
-            vict_path.parent
-            / constructor.FOLDER_NAME
-            / constructor.MODEL_FILENAME
+            vict_path.parent / constructor.FOLDER_NAME / constructor.MODEL_FILENAME
         )
         if prune_path.exists():
             prune_manager = constructor.load(model_path=prune_path, gpu=gpu)
@@ -412,12 +408,10 @@ def loadPrunedProfilesToFolder(
 
     file_count = 0
     constructor = StructuredPruneModelManager if structured else PruneModelManager
-    
+
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         prune_path = (
-            vict_path.parent
-            / constructor.FOLDER_NAME
-            / constructor.MODEL_FILENAME
+            vict_path.parent / constructor.FOLDER_NAME / constructor.MODEL_FILENAME
         )
         if prune_path.exists():
             manager = constructor.load(model_path=prune_path)
@@ -782,7 +776,7 @@ if __name__ == "__main__":
     # ---------------------------------------
     # Structured pruning workflow
     # ---------------------------------------
-    
+
     # Step 1: generate structured pruned models
     # pruneVictimModels(
     #     finetune_epochs=0,

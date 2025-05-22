@@ -1,8 +1,4 @@
-"""
-Takes cleaned profile data and runs classifiers on it to predict model architecture.
-
-Currently supports logistic regression and neural net.
-"""
+"""Takes cleaned profile data and runs classifiers on it to predict model architecture."""
 from pathlib import Path
 from typing import List, Tuple
 import numpy as np
@@ -33,7 +29,16 @@ from config import SYSTEM_SIGNALS
 
 
 class ArchPredBase(ABC):
-    def __init__(self, df, name: str, label=None, verbose=True, deterministic=True, train_size=None, test_size=None) -> None:
+    def __init__(
+        self,
+        df,
+        name: str,
+        label=None,
+        verbose=True,
+        deterministic=True,
+        train_size=None,
+        test_size=None,
+    ) -> None:
         if label is None:
             label = "model"
         self.verbose = verbose
@@ -45,7 +50,12 @@ class ArchPredBase(ABC):
         self.orig_cols = list(all_x.columns)
         all_y_labeled = self.label_encoder.fit_transform(all_y)
         x_tr, x_test, y_train, y_test = train_test_split(
-            all_x, all_y_labeled, random_state=42, stratify=all_y_labeled, train_size=train_size, test_size=test_size
+            all_x,
+            all_y_labeled,
+            random_state=42,
+            stratify=all_y_labeled,
+            train_size=train_size,
+            test_size=test_size,
         )
         self.x_tr = x_tr
         self.x_test = x_test
@@ -117,8 +127,10 @@ class ArchPredBase(ABC):
         acc = self.model.score(self.x_test, self.y_test)
         print(f"{self.name} test acc: {acc}")
         return acc
-    
-    def evaluateAcc(self, data: pd.DataFrame, y_label: str = "model", preprocess: bool = True) -> float:
+
+    def evaluateAcc(
+        self, data: pd.DataFrame, y_label: str = "model", preprocess: bool = True
+    ) -> float:
         # data columns must match training data columns
         y = self.label_encoder.transform(data[y_label])
         if not preprocess:
@@ -138,7 +150,6 @@ class ArchPredBase(ABC):
     #     results = []
     #     for i in range(1, k+1):
     #         results.append(top_k_accuracy_score(y, self.get))
-        
 
 
 class RFEArchPred(ArchPredBase):
@@ -223,7 +234,15 @@ class NNArchPred(ArchPredBase):
     ):
         if name is None:
             name = self.NAME
-        super().__init__(df=df, name=name, label=label, verbose=verbose, deterministic=False, train_size=train_size, test_size=test_size)
+        super().__init__(
+            df=df,
+            name=name,
+            label=label,
+            verbose=verbose,
+            deterministic=False,
+            train_size=train_size,
+            test_size=test_size,
+        )
         print(
             f"Instantiating neural net with {self.num_classes} classes and input size of {self.input_size}"
         )
@@ -296,7 +315,15 @@ class NN2LRArchPred(SKLearnClassifier):
     ):
         if name is None:
             name = self.NAME
-        super().__init__(df=df, name=name, label=label, verbose=verbose, deterministic=False, train_size=train_size, test_size=test_size)
+        super().__init__(
+            df=df,
+            name=name,
+            label=label,
+            verbose=verbose,
+            deterministic=False,
+            train_size=train_size,
+            test_size=test_size,
+        )
         layer_sizes = [len(self.orig_cols)]
         for i in range(num_layers - 1):
             layer_sizes.append(layer_sizes[i] * hidden_layer_factor)
@@ -308,7 +335,7 @@ class NN2LRArchPred(SKLearnClassifier):
             hidden_layer_sizes=layer_sizes,
             solver=solver,
             # early_stopping=True,
-            #validation_fraction=0.2,
+            # validation_fraction=0.2,
         )
         self.model = make_pipeline(StandardScaler(), self.estimator)
         self.model.fit(self.x_tr, self.y_train)
@@ -335,11 +362,18 @@ class LRArchPred(RFEArchPred, SKLearnClassifier):
         multi_class: str = "auto",
         penalty: str = "l2",
         train_size=None,
-        test_size=None
+        test_size=None,
     ) -> None:
         if name is None:
             name = self.NAME
-        super().__init__(df=df, name=name, label=label, verbose=verbose, train_size=train_size, test_size=test_size)
+        super().__init__(
+            df=df,
+            name=name,
+            label=label,
+            verbose=verbose,
+            train_size=train_size,
+            test_size=test_size,
+        )
         self.estimator = LogisticRegression(
             multi_class=multi_class, penalty=penalty, max_iter=1000
         )
@@ -350,9 +384,7 @@ class LRArchPred(RFEArchPred, SKLearnClassifier):
             verbose=10 if self.verbose else 0,
         )
         if len(self.orig_cols) == 1:
-            self.model = make_pipeline(
-                StandardScaler(), MinMaxScaler(), self.estimator
-            )
+            self.model = make_pipeline(StandardScaler(), MinMaxScaler(), self.estimator)
         else:
             self.model = make_pipeline(
                 StandardScaler(), MinMaxScaler(), self.rfe, self.estimator
@@ -380,7 +412,15 @@ class RFArchPred(RFEArchPred, SKLearnClassifier):
     ) -> None:
         if name is None:
             name = self.NAME
-        super().__init__(df=df, name=name, label=label, verbose=verbose, deterministic=False, train_size=train_size, test_size=test_size)
+        super().__init__(
+            df=df,
+            name=name,
+            label=label,
+            verbose=verbose,
+            deterministic=False,
+            train_size=train_size,
+            test_size=test_size,
+        )
         self.estimator = RandomForestClassifier(n_estimators=num_estimators)
         self.num_estimators = num_estimators
         self.rfe_num = rfe_num if rfe_num is not None else len(list(self.x_tr))
@@ -390,9 +430,7 @@ class RFArchPred(RFEArchPred, SKLearnClassifier):
             verbose=10 if self.verbose else 0,
         )
         if len(self.orig_cols) == 1:
-            self.model = make_pipeline(
-                StandardScaler(), MinMaxScaler(), self.estimator
-            )
+            self.model = make_pipeline(StandardScaler(), MinMaxScaler(), self.estimator)
         else:
             self.model = make_pipeline(
                 StandardScaler(), MinMaxScaler(), self.rfe, self.estimator
@@ -401,7 +439,7 @@ class RFArchPred(RFEArchPred, SKLearnClassifier):
         if self.verbose:
             self.printFeatures()
             self.evaluateTest()
-        
+
     def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
         if preprocess:
             x = self.preprocessInput(x)
@@ -426,7 +464,14 @@ class KNNArchPred(SKLearnClassifier):
     ) -> None:
         if name is None:
             name = self.NAME
-        super().__init__(df=df, name=name, label=label, verbose=verbose, train_size=train_size, test_size=test_size)
+        super().__init__(
+            df=df,
+            name=name,
+            label=label,
+            verbose=verbose,
+            train_size=train_size,
+            test_size=test_size,
+        )
         self.estimator = KNeighborsClassifier(n_neighbors=k, weights=weights)
         self.k = k
         self.weights = weights
@@ -446,10 +491,19 @@ class CentroidArchPred(SKLearnClassifier):
     NAME = "centroid"
     FULL_NAME = "Nearest Centroid"
 
-    def __init__(self, df, label=None, verbose=True, name=None, train_size=None, test_size=None) -> None:
+    def __init__(
+        self, df, label=None, verbose=True, name=None, train_size=None, test_size=None
+    ) -> None:
         if name is None:
             name = self.NAME
-        super().__init__(df=df, name=name, label=label, verbose=verbose, train_size=train_size, test_size=test_size)
+        super().__init__(
+            df=df,
+            name=name,
+            label=label,
+            verbose=verbose,
+            train_size=train_size,
+            test_size=test_size,
+        )
         self.estimator = NearestCentroid()
         self.model = make_pipeline(StandardScaler(), MinMaxScaler(), self.estimator)
         self.model.fit(self.x_tr, self.y_train)
@@ -481,7 +535,14 @@ class NBArchPred(SKLearnClassifier):
     ) -> None:
         if name is None:
             name = self.NAME
-        super().__init__(df=df, name=name, label=label, verbose=verbose, train_size=train_size, test_size=test_size)
+        super().__init__(
+            df=df,
+            name=name,
+            label=label,
+            verbose=verbose,
+            train_size=train_size,
+            test_size=test_size,
+        )
         self.estimator = GaussianNB()
         self.model = make_pipeline(StandardScaler(), MinMaxScaler(), self.estimator)
         self.model.fit(self.x_tr, self.y_train)
@@ -512,7 +573,15 @@ class ABArchPred(RFEArchPred, SKLearnClassifier):
     ) -> None:
         if name is None:
             name = self.NAME
-        super().__init__(df=df, name=name, label=label, verbose=verbose, deterministic=False, train_size=train_size, test_size=test_size)
+        super().__init__(
+            df=df,
+            name=name,
+            label=label,
+            verbose=verbose,
+            deterministic=False,
+            train_size=train_size,
+            test_size=test_size,
+        )
         self.estimator = AdaBoostClassifier(n_estimators=num_estimators)
         self.num_estimators = num_estimators
         self.rfe_num = rfe_num if rfe_num is not None else len(list(self.x_tr))
@@ -522,9 +591,7 @@ class ABArchPred(RFEArchPred, SKLearnClassifier):
             verbose=10 if self.verbose else 0,
         )
         if len(self.orig_cols) == 1:
-            self.model = make_pipeline(
-                StandardScaler(), MinMaxScaler(), self.estimator
-            )
+            self.model = make_pipeline(StandardScaler(), MinMaxScaler(), self.estimator)
         else:
             self.model = make_pipeline(
                 StandardScaler(), MinMaxScaler(), self.rfe, self.estimator
@@ -533,7 +600,7 @@ class ABArchPred(RFEArchPred, SKLearnClassifier):
         if self.verbose:
             self.printFeatures()
             self.evaluateTest()
-        
+
     def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
         if preprocess:
             x = self.preprocessInput(x)
@@ -559,9 +626,10 @@ def get_arch_pred_model(
     }
     return arch_model[model_type](df=df, label=label, **kwargs)
 
+
 def arch_model_names():
     return [
-        #NNArchPred.NAME,
+        # NNArchPred.NAME,
         LRArchPred.NAME,
         NN2LRArchPred.NAME,
         KNNArchPred.NAME,
@@ -571,9 +639,10 @@ def arch_model_names():
         ABArchPred.NAME,
     ]
 
+
 def arch_model_full_name():
     return {
-        #NNArchPred.NAME: NNArchPred.FULL_NAME,
+        # NNArchPred.NAME: NNArchPred.FULL_NAME,
         LRArchPred.NAME: LRArchPred.FULL_NAME,
         NN2LRArchPred.NAME: NN2LRArchPred.FULL_NAME,
         KNNArchPred.NAME: KNNArchPred.FULL_NAME,

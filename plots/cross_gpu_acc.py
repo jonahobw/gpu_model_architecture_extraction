@@ -50,6 +50,7 @@ QUADRO_TEST = Path.cwd() / "victim_profiles"
 TESLA_TRAIN = Path.cwd() / "profiles" / "tesla_t4" / "colab_zero_exe_pretrained"
 TESLA_TEST = Path.cwd() / "victim_profiles_tesla"
 
+
 def loadFeatureRank(filename: str):
     if not filename.endswith(".json"):
         filename += ".json"
@@ -67,19 +68,33 @@ def getDF(path: Path, to_keep_path: Path = None, df_args: dict = {}):
         df = removeColumnsFromOther(keep_df, df)
     return df
 
+
 def getTestAcc(model: ArchPredBase, gpu_type: str, verbose: bool = False):
-    """NOT USING THIS, INSTEAD LOAD THE PROFILES INTO A FOLDER 
+    """NOT USING THIS, INSTEAD LOAD THE PROFILES INTO A FOLDER
     USING loadProfilesToFolder() from model_manager.py
     """
     vict_model_paths = VictimModelManager.getModelPaths()
     for vict_path in vict_model_paths:
         print(f"Getting profiles for {vict_path.parent.name}...")
         manager = VictimModelManager.load(vict_path)
-        
 
-def generateCrossGPUReport(quadro_train: pd.DataFrame, tesla_train: pd.DataFrame, config: dict, model_names: List[str], topk: List[int] = [1, 5], train_size: int = None):
-    #TODO do we want number of experiments as measure of centrality?
-    columns = ["Architecture Prediction Model Type", "Train Quadro RTX 8000, Test Tesla", "Train Quadro RTX 8000, Test Tesla Family", "Train Tesla, Test Quadro RTX 8000", "Train Tesla, Test Quadro RTX 8000 Family"]
+
+def generateCrossGPUReport(
+    quadro_train: pd.DataFrame,
+    tesla_train: pd.DataFrame,
+    config: dict,
+    model_names: List[str],
+    topk: List[int] = [1, 5],
+    train_size: int = None,
+):
+    # TODO do we want number of experiments as measure of centrality?
+    columns = [
+        "Architecture Prediction Model Type",
+        "Train Quadro RTX 8000, Test Tesla",
+        "Train Quadro RTX 8000, Test Tesla Family",
+        "Train Tesla, Test Quadro RTX 8000",
+        "Train Tesla, Test Quadro RTX 8000 Family",
+    ]
 
     for k in topk:
         columns.append(f"Train Quadro RTX 8000, Test Tesla Top {k}")
@@ -88,37 +103,51 @@ def generateCrossGPUReport(quadro_train: pd.DataFrame, tesla_train: pd.DataFrame
     table = pd.DataFrame(columns=columns)
 
     for model_type in model_names:
-        row_data = {"Architecture Prediction Model Type": arch_model_full_name()[model_type]}
+        row_data = {
+            "Architecture Prediction Model Type": arch_model_full_name()[model_type]
+        }
         # train on quadro
-        model = get_arch_pred_model(model_type=model_type, df=quadro_train, kwargs={"train_size": train_size})
+        model = get_arch_pred_model(
+            model_type=model_type, df=quadro_train, kwargs={"train_size": train_size}
+        )
 
         # test on tesla
-        k_acc_report = predictVictimArchs(model, TESLA_TEST, save=False, topk=max(topk), verbose=False)
+        k_acc_report = predictVictimArchs(
+            model, TESLA_TEST, save=False, topk=max(topk), verbose=False
+        )
         k_acc = k_acc_report["accuracy_k"]
 
-        row_data["Train Quadro RTX 8000, Test Tesla Family"] = k_acc_report["family_accuracy"]
-        
+        row_data["Train Quadro RTX 8000, Test Tesla Family"] = k_acc_report[
+            "family_accuracy"
+        ]
+
         topk_str = ""
         for k in topk:
             row_data[f"Train Quadro RTX 8000, Test Tesla Top {k}"] = k_acc[k] * 100
             topk_str += "{:.3g}/".format(k_acc[k] * 100)
-        
+
         row_data["Train Quadro RTX 8000, Test Tesla"] = topk_str[:-1]
 
-        #train on tesla
-        model = get_arch_pred_model(model_type=model_type, df=tesla_train, kwargs={"train_size": train_size})
+        # train on tesla
+        model = get_arch_pred_model(
+            model_type=model_type, df=tesla_train, kwargs={"train_size": train_size}
+        )
 
         # test on quadro
-        k_acc_report = predictVictimArchs(model, QUADRO_TEST, save=False, topk=max(topk), verbose=False)
+        k_acc_report = predictVictimArchs(
+            model, QUADRO_TEST, save=False, topk=max(topk), verbose=False
+        )
         k_acc = k_acc_report["accuracy_k"]
-        
-        row_data["Train Tesla, Test Quadro RTX 8000 Family"] = k_acc_report["family_accuracy"]
+
+        row_data["Train Tesla, Test Quadro RTX 8000 Family"] = k_acc_report[
+            "family_accuracy"
+        ]
 
         topk_str = ""
         for k in topk:
             row_data[f"Train Tesla, Test Quadro RTX 8000 Top {k}"] = k_acc[k] * 100
             topk_str += "{:.3g}/".format(k_acc[k] * 100)
-        
+
         row_data["Train Tesla, Test Quadro RTX 8000"] = topk_str[:-1]
 
         table = table.append(row_data, ignore_index=True)
@@ -129,7 +158,7 @@ def generateCrossGPUReport(quadro_train: pd.DataFrame, tesla_train: pd.DataFrame
 
     config["topk"] = topk
     config["feature_analysis"] = featureAnalysis(quadro_train, tesla_train)
-    with open(SAVE_FOLDER / f"{time}.json", 'w') as f:
+    with open(SAVE_FOLDER / f"{time}.json", "w") as f:
         json.dump(config, f, indent=4)
 
 
@@ -144,10 +173,14 @@ def featureAnalysis(quadro_train: pd.DataFrame, tesla_train: pd.DataFrame):
 
     print("\n\nNote: these feature counts include the 3 label features")
     print("model, model_family, and file")
-    print(f"Quadro:          {len(quadro_features)} features, {len(quadro_unique)} unique.")
+    print(
+        f"Quadro:          {len(quadro_features)} features, {len(quadro_unique)} unique."
+    )
     for feature in quadro_unique:
         print(f"\t{feature}")
-    print(f"Tesla:           {len(tesla_features)} features, {len(tesla_unique)} unique.")
+    print(
+        f"Tesla:           {len(tesla_features)} features, {len(tesla_unique)} unique."
+    )
     for feature in tesla_unique:
         print(f"\t{feature}")
     print(f"Shared Features: {len(shared_cols)}")
@@ -171,9 +204,7 @@ def featureAnalysis(quadro_train: pd.DataFrame, tesla_train: pd.DataFrame):
     return report
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     model_names = arch_model_names()  # all the models we want to use
 
@@ -186,11 +217,11 @@ if __name__ == '__main__':
     # if None, use all features. Else, this is a name of a feature ranking under
     # feature_ranks/
     feature_ranking_file = "rf_gpu_kernels_nomem.json"
-    feature_num = 25    # the number of features to use
+    feature_num = 25  # the number of features to use
 
     # args to pass to load training data, if feature rank file is provided,
     # then this should be an empty dict
-    df_args = {}    #{"no_system_data": True, "gpu_activities_only": True}
+    df_args = {}  # {"no_system_data": True, "gpu_activities_only": True}
 
     # substrings to remove from the dataframe, if feature rank file is provided,
     # then this should be empty
@@ -203,17 +234,17 @@ if __name__ == '__main__':
 
     quadro_train = getDF(QUADRO_TRAIN, df_args=df_args)
     tesla_train = getDF(TESLA_TRAIN, df_args=df_args)
-    
+
     if feature_ranking_file is not None:
         feature_ranking = loadFeatureRank(feature_ranking_file)
         relevant_features = feature_ranking[:feature_num]
 
         quadro_train = filter_cols(quadro_train, substrs=relevant_features)
         tesla_train = filter_cols(tesla_train, substrs=relevant_features)
-    
+
     quadro_train = remove_cols(quadro_train, substrs=df_remove_substrs)
     tesla_train = remove_cols(tesla_train, df_remove_substrs)
-    
+
     config = {
         "train_size": train_size,
         "feature_ranking_file": feature_ranking_file,
@@ -223,9 +254,11 @@ if __name__ == '__main__':
         "model_names": model_names,
     }
 
-    generateCrossGPUReport(quadro_train=quadro_train, tesla_train=tesla_train, config=config, model_names=model_names, topk=topk, train_size=train_size)
-
-
-    
-
-
+    generateCrossGPUReport(
+        quadro_train=quadro_train,
+        tesla_train=tesla_train,
+        config=config,
+        model_names=model_names,
+        topk=topk,
+        train_size=train_size,
+    )

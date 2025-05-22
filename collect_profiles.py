@@ -54,7 +54,9 @@ def run_command_popen(folder, command, model_type):
 def generateExeName(use_exe: bool, use_tf: bool) -> str:
     if use_tf:
         assert not use_exe
-        return "python " + str(Path(__file__).parent / "tensorflow" / "model_inference.py")
+        return "python " + str(
+            Path(__file__).parent / "tensorflow" / "model_inference.py"
+        )
     system = getSystem()
     executable = f"exe/{system}/{system}_inference.exe"
     if not use_exe:
@@ -141,9 +143,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "-use_tf",
         action="store_true",
-        help="Use tensorflow for profiling.  Requires -noexe flag as well."
+        help="Use tensorflow for profiling.  Requires -noexe flag as well.",
     )
-    parser.add_argument("-email", action="store_true", help="send emails when each model is done profiling.")
+    parser.add_argument(
+        "-email",
+        action="store_true",
+        help="send emails when each model is done profiling.",
+    )
 
     args = parser.parse_args()
 
@@ -213,7 +219,7 @@ if __name__ == "__main__":
 
                 if args.pretrained:
                     command += " -pretrained"
-                
+
                 if args.use_tf:
                     command = (
                         f"nvprof --csv --log-file {log_file_prefix}%p.csv --system-profiling on "
@@ -224,7 +230,9 @@ if __name__ == "__main__":
                 success, file = run_command(model_folder, command)
                 retries = 0
                 while not success:
-                    print(f"\nNvprof failed while running command\n\n{command}\n\nretrying ... \n")
+                    print(
+                        f"\nNvprof failed while running command\n\n{command}\n\nretrying ... \n"
+                    )
                     time.sleep(10)
                     latest_file(model_folder).unlink()
                     success, file = run_command(model_folder, command)
@@ -256,9 +264,11 @@ if __name__ == "__main__":
 
         except Exception as e:
             tb = traceback.format_exc()
-            config.EMAIL.email(f"PROGRAM CRASHED During Profile Collection for {model}", f"{tb}\n\n{dict_to_str(save_args)}")
+            config.EMAIL.email(
+                f"PROGRAM CRASHED During Profile Collection for {model}",
+                f"{tb}\n\n{dict_to_str(save_args)}",
+            )
             raise e
-            
+
         if args.nosave:
             shutil.rmtree(profile_folder)
-    

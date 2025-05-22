@@ -3,14 +3,15 @@ import json
 from pathlib import Path
 from typing import List
 
+
 def timer(time_in_s: float) -> str:
     hours, rem = divmod(time_in_s, 3600)
     minutes, seconds = divmod(rem, 60)
-    return "{:0>2}:{:0>2}:{:0>2}".format(int(hours),int(minutes),int(seconds))
+    return "{:0>2}:{:0>2}:{:0>2}".format(int(hours), int(minutes), int(seconds))
 
 
 def getSystem() -> str:
-    if os.name != 'nt':
+    if os.name != "nt":
         system = "linux"
     else:
         system = "windows"
@@ -25,6 +26,7 @@ def latest_file(path: Path, pattern: str = "*", oldest: bool = False) -> Path:
         return None
     return latestFileFromList(files, oldest=oldest)
 
+
 def latestFileFromList(paths: List[Path], oldest: bool = False) -> Path:
     """
     Given a list of paths, return the path of the latest file.
@@ -35,6 +37,7 @@ def latestFileFromList(paths: List[Path], oldest: bool = False) -> Path:
         return min(paths, key=lambda x: x.stat().st_ctime)
     return max(paths, key=lambda x: x.stat().st_ctime)
 
+
 def dict_to_str(dictionary, indent: int = 4) -> str:
     def default(x):
         try:
@@ -43,10 +46,11 @@ def dict_to_str(dictionary, indent: int = 4) -> str:
         except ValueError:
             pass
         return f"JSON Parse Error for Object of type: {type(x)}"
+
     return json.dumps(dictionary, indent=indent, default=default)
 
 
-def checkDict(config: dict, args_dict: dict) ->bool:
+def checkDict(config: dict, args_dict: dict) -> bool:
     """
     Recursive function for checking that arguments in
     a dictionary match a config. supports multilevel dicts.
@@ -55,7 +59,9 @@ def checkDict(config: dict, args_dict: dict) ->bool:
         if arg not in config:
             return False
         elif isinstance(args_dict[arg], dict):
-            if not isinstance(config[arg], dict) or not checkDict(config[arg], args_dict[arg]):
+            if not isinstance(config[arg], dict) or not checkDict(
+                config[arg], args_dict[arg]
+            ):
                 return False
         elif args_dict[arg] != config[arg]:
             return False

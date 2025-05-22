@@ -40,18 +40,27 @@ from experiments import predictVictimArchs
 from config import SYSTEM_SIGNALS
 from utils import latest_file
 
-rc('font',**{'family':'serif','serif':['Times'], 'size': 14})
-rc('figure', **{'figsize': (5, 4)})
+rc("font", **{"family": "serif", "serif": ["Times"], "size": 14})
+rc("figure", **{"figsize": (5, 4)})
 
 
-def getDF(path: Path = None, to_keep_path: Path = None, save_path: Path = None, gpu_activities_only=False):
+def getDF(
+    path: Path = None,
+    to_keep_path: Path = None,
+    save_path: Path = None,
+    gpu_activities_only=False,
+):
     if to_keep_path is None:
         to_keep_path = (
             Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
         )
     if path is None:
         path = to_keep_path
-    df = all_data(path, no_system_data=gpu_activities_only, gpu_activities_only=gpu_activities_only)
+    df = all_data(
+        path,
+        no_system_data=gpu_activities_only,
+        gpu_activities_only=gpu_activities_only,
+    )
 
     keep_df = all_data(to_keep_path)
     # remove cols of df if they aren't in keep_df
@@ -113,7 +122,9 @@ def generateReport(
 
     try:
         for i, num_features in enumerate(x_axis):
-            print(f"Running {num_experiments} experiments with {num_features} features.")
+            print(
+                f"Running {num_experiments} experiments with {num_features} features."
+            )
             new_features = feature_rank[:num_features]
             new_df = filter_cols(df, substrs=new_features)
             for model_name in model_names:
@@ -124,22 +135,38 @@ def generateReport(
                     report[model_name]["train_acc"][i][exp] = model.evaluateTrain()
                     report[model_name]["val_acc"][i][exp] = model.evaluateTest()
                     report[model_name]["test_acc"][i][exp] = predictVictimArchs(
-                        model, folder=Path.cwd() / "victim_profiles", save=False, topk=1, verbose=False
+                        model,
+                        folder=Path.cwd() / "victim_profiles",
+                        save=False,
+                        topk=1,
+                        verbose=False,
                     )["accuracy_k"][1]
                     if model.deterministic:
                         # only need to run one experiment, copy the result to the array
-                        report[model_name]["train_acc"][i] = np.full((num_experiments), report[model_name]["train_acc"][i][exp])
-                        report[model_name]["test_acc"][i] = np.full((num_experiments), report[model_name]["test_acc"][i][exp])
-                        report[model_name]["val_acc"][i] = np.full((num_experiments), report[model_name]["val_acc"][i][exp])
+                        report[model_name]["train_acc"][i] = np.full(
+                            (num_experiments), report[model_name]["train_acc"][i][exp]
+                        )
+                        report[model_name]["test_acc"][i] = np.full(
+                            (num_experiments), report[model_name]["test_acc"][i][exp]
+                        )
+                        report[model_name]["val_acc"][i] = np.full(
+                            (num_experiments), report[model_name]["val_acc"][i][exp]
+                        )
                         break
 
         for model_name in report:
-            report[model_name]["train_std"] = report[model_name]["train_acc"].std(axis=1)
-            report[model_name]["train_mean"] = report[model_name]["train_acc"].mean(axis=1)
+            report[model_name]["train_std"] = report[model_name]["train_acc"].std(
+                axis=1
+            )
+            report[model_name]["train_mean"] = report[model_name]["train_acc"].mean(
+                axis=1
+            )
             report[model_name]["val_std"] = report[model_name]["val_acc"].std(axis=1)
             report[model_name]["val_mean"] = report[model_name]["val_acc"].mean(axis=1)
             report[model_name]["test_std"] = report[model_name]["test_acc"].std(axis=1)
-            report[model_name]["test_mean"] = report[model_name]["test_acc"].mean(axis=1)
+            report[model_name]["test_mean"] = report[model_name]["test_acc"].mean(
+                axis=1
+            )
     except KeyboardInterrupt:
         pass
 
@@ -154,13 +181,11 @@ def generateReport(
         def json_handler(x):
             if isinstance(x, np.ndarray):
                 return x.tolist()
-            raise TypeError(
-                "Unserializable object {} of type {}".format(x, type(x))
-            )
+            raise TypeError("Unserializable object {} of type {}".format(x, type(x)))
 
         if not save_report_name.endswith(".json"):
             save_report_name += ".json"
-        
+
         report_folder = Path(__file__).parent.absolute() / "reports"
         report_folder.mkdir(exist_ok=True)
         save_path = report_folder / save_report_name
@@ -195,7 +220,7 @@ def saveFeatureRank(feature_rank: List[str], metadata: dict = {}, save_name=None
         save_name += ".json"
 
     report = {"feature_rank": feature_rank, **metadata}
-    feature_rank_folder = Path(__file__).parent.absolute() / "feature_ranks" 
+    feature_rank_folder = Path(__file__).parent.absolute() / "feature_ranks"
     feature_rank_folder.mkdir(exist_ok=True)
     save_path = feature_rank_folder / save_name
     with open(save_path, "w") as f:
@@ -222,7 +247,10 @@ def plotFromReport(
             plt.plot(x_axis, report[model_name][f"{dataset}_mean"], label=label)
             minus_std = []
             plus_std = []
-            for mean, std in zip(report[model_name][f"{dataset}_mean"], report[model_name][f"{dataset}_std"]):
+            for mean, std in zip(
+                report[model_name][f"{dataset}_mean"],
+                report[model_name][f"{dataset}_std"],
+            ):
                 minus_std.append(mean - std)
                 plus_std.append(mean + std)
             plt.fill_between(
@@ -232,13 +260,13 @@ def plotFromReport(
                 alpha=0.2,
             )
 
-    #plt.rcParams["figure.figsize"] = (3, 3)
+    # plt.rcParams["figure.figsize"] = (3, 3)
     plt.tight_layout()
     plt.xlabel("Number of Features to Train Architecture Prediction Model")
 
     x_axis_lim = max(x_axis) if xlim_upper is None else xlim_upper
 
-    interval = (x_axis_lim // 10)
+    interval = x_axis_lim // 10
     ticks = [x for x in range(0, x_axis_lim, interval)]
     ticks[0] = 1
     ticks.append(x_axis_lim)
@@ -258,13 +286,17 @@ def plotFromReport(
         )
     if xlim_upper is not None:
         plt.xlim(left=0, right=xlim_upper)
-    
+
     plt.legend(loc=(0.68, 0.23))
-    
+
     if not save_name.endswith(".png"):
         save_name += ".png"
-    
-    plt.savefig(Path(__file__).parent / "arch_pred_acc" / save_name, dpi=500, bbox_inches="tight")
+
+    plt.savefig(
+        Path(__file__).parent / "arch_pred_acc" / save_name,
+        dpi=500,
+        bbox_inches="tight",
+    )
 
 
 if __name__ == "__main__":
@@ -281,7 +313,7 @@ if __name__ == "__main__":
     no_memory = True
     model_kwargs = {}
 
-    #features_filename = "combined_feature_rank_ab_lr_rf.json" 
+    # features_filename = "combined_feature_rank_ab_lr_rf.json"
     features_filename = f"{features_model}"
     if gpu_activities_only:
         features_filename += f"_gpu_kernels"
@@ -289,14 +321,14 @@ if __name__ == "__main__":
         features_filename += "_nomem"
 
     # ------------------------------------------------------------------------------
-    
+
     load_report = (
         True  # if true, load report from file, if false, generate report and save
     )
 
     # parameters for generating a report, for loading a report, only the first variable
     # needs to be set
-    # report_name = "combined_report" 
+    # report_name = "combined_report"
     report_name = features_filename
 
     folder = Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
@@ -309,12 +341,12 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------------
 
     # plotting
-    plot = True    # whether or not to plot
+    plot = True  # whether or not to plot
     plot_model_names = model_names
-    plot_datasets = ['val'] #['val', 'train', 'test']
+    plot_datasets = ["val"]  # ['val', 'train', 'test']
     xlim_upper = 30
     plot_save_name = f"{report_name}_{plot_datasets[-1]}"
-    title=False
+    title = False
 
     # ------------------------------------------------------------------------------
 
@@ -356,7 +388,7 @@ if __name__ == "__main__":
     else:
         # load report
         report = loadReport(report_name)
-    
+
     if plot:
         plotFromReport(
             report=report,
@@ -364,6 +396,5 @@ if __name__ == "__main__":
             datasets=plot_datasets,
             xlim_upper=xlim_upper,
             save_name=plot_save_name,
-            title = title,
+            title=title,
         )
-

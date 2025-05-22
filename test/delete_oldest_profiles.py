@@ -21,10 +21,6 @@ def removeLatestProfiles(path: Path, number: int):
         latest_file.unlink()
 
 
-
-
-        
-
 profile_path = Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
 
 models = ["wide_resnet101_2", "wide_resnet50_2"]

@@ -34,7 +34,7 @@ def parse_prof(profile_csv=None, config_file=None, gpu=0):
     if config_file is not None:
         with open(config_file, "r") as f:
             conf = json.load(f)
-        gpu=conf["gpu"]
+        gpu = conf["gpu"]
     return parse_one_profile(profile_csv, gpu=gpu)
 
 
@@ -410,7 +410,6 @@ def check_specific_cols_model_mean(
     )
 
 
-
 def predict_all_victim_profiles(arch_model: ArchPredBase, exclude_cols=[]):
     data = all_data("zero_noexe_lots_models")
     for col in data.columns:
@@ -550,7 +549,9 @@ def getDF(path: Path = None, save_path: Path = None):
     exclude_cols = SYSTEM_SIGNALS
     exclude_cols.extend(["mem"])
     # exclude_cols.extend(["avg_ms", "time_ms", "max_ms", "min_us"])
-    exclude_cols.extend(["memcpy", "Malloc", "malloc", "memset"])#, "avg_us", "time_ms", "max_ms", "min_us", "indicator"])
+    exclude_cols.extend(
+        ["memcpy", "Malloc", "malloc", "memset"]
+    )  # , "avg_us", "time_ms", "max_ms", "min_us", "indicator"])
     df = remove_cols(df, substrs=exclude_cols)
     # df = filter_cols(df, substrs=["indicator"])
     # df = filter_cols(df, substrs=["num_calls"])
@@ -599,7 +600,9 @@ if __name__ == "__main__":
     # saveProfileFeatures(df, "resnet50")
 
     # model = get_arch_pred_model("nn", df=df)
-    model = get_arch_pred_model("nn", df=df, kwargs={"num_layers": 5, "hidden_layer_factor": 1})
+    model = get_arch_pred_model(
+        "nn", df=df, kwargs={"num_layers": 5, "hidden_layer_factor": 1}
+    )
     # model = get_arch_pred_model("lr", df=df, kwargs={"multi_class": 'multinomial', "penalty": "l2"})    # these are the default args
     # model = get_arch_pred_model("lr", df=df, kwargs={"multi_class": 'multinomial', "penalty": "none"})
     # model = get_arch_pred_model("lr", df=df, kwargs={"multi_class": 'ovr', "penalty": "none"})

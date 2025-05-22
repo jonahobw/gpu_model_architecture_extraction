@@ -1,7 +1,7 @@
 import sys
 
 # setting path
-sys.path.append('../edge_profile')
+sys.path.append("../edge_profile")
 
 from model_manager import VictimModelManager
 
@@ -16,7 +16,14 @@ sample_average = 5
 random = False
 entropy = False
 
-manager.loadKnockoffTransferSet(dataset_name=dataset, transfer_size=transfer_size, sample_avg=sample_average, random_policy=random, entropy=entropy, force=True)
+manager.loadKnockoffTransferSet(
+    dataset_name=dataset,
+    transfer_size=transfer_size,
+    sample_avg=sample_average,
+    random_policy=random,
+    entropy=entropy,
+    force=True,
+)
 
 # file, dataset = manager.loadKnockoffTransferSet(dataset_name=dataset, transfer_size=transfer_size, sample_avg=sample_average, random_policy=random)
 

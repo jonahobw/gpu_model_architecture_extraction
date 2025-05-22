@@ -14,6 +14,7 @@ from format_profiles import read_csv
 import config
 import json
 
+
 def subsample(df: pd.DataFrame, num: int, col: str = "model") -> pd.DataFrame:
     """
     Return a dataframe with the first <num> rows from each value in column <col>.
@@ -33,7 +34,8 @@ def removeColumnsFromOther(keep_cols, remove_df):
 
 
 def softmax(x):
-    return(np.exp(x - np.max(x)) / np.exp(x - np.max(x)).sum())
+    return np.exp(x - np.max(x)) / np.exp(x - np.max(x)).sum()
+
 
 def remove_cols(df: pd.DataFrame, substrs: list, endswith: bool = False, verbose=False):
     """Removes columns of the dataframe which include (or end with) any of the substrings."""
@@ -59,7 +61,9 @@ def remove_cols(df: pd.DataFrame, substrs: list, endswith: bool = False, verbose
     return df.drop(remove_columns, axis=1)
 
 
-def filter_cols(df: pd.DataFrame, substrs: list, keep: list = None, verbose: bool=False):
+def filter_cols(
+    df: pd.DataFrame, substrs: list, keep: list = None, verbose: bool = False
+):
     """Only keeps columns containing substrings"""
     if keep is None:
         keep = ["model", "model_family", "file"]
@@ -72,7 +76,7 @@ def filter_cols(df: pd.DataFrame, substrs: list, keep: list = None, verbose: boo
             if col_name == x:
                 return True
         return False
-    
+
     remove_columns = [col_name for col_name in df.columns if not keep_col(col_name)]
     if verbose:
         print("\nRemoving columns:")
@@ -82,21 +86,36 @@ def filter_cols(df: pd.DataFrame, substrs: list, keep: list = None, verbose: boo
     return df.drop(remove_columns, axis=1)
 
 
-def get_csv(aggregated_csv_folder, remove_nans=True, gpu_activities_only=False, api_calls_only=False):
-    df = read_csv(aggregated_csv_folder, gpu_activities_only=gpu_activities_only, api_calls_only=api_calls_only)
+def get_csv(
+    aggregated_csv_folder,
+    remove_nans=True,
+    gpu_activities_only=False,
+    api_calls_only=False,
+):
+    df = read_csv(
+        aggregated_csv_folder,
+        gpu_activities_only=gpu_activities_only,
+        api_calls_only=api_calls_only,
+    )
     if remove_nans:
         df = remove_cols(df, "nan", verbose=True)
     return df
 
 
-def missing_data(aggregated_csv_folder, gpu_activities_only=False, api_calls_only=False):
+def missing_data(
+    aggregated_csv_folder, gpu_activities_only=False, api_calls_only=False
+):
     """
     Returns the columns and number of missing datapoints by model.  Missing data are denoted by NaN.
 
     :param aggregated_csv_folder: path to the folder under ./profiles/ which contains the aggregated.csv file.
     :return: A dict keyed by model with the columns with missing data and the number of missing datapoints.
     """
-    df = get_csv(aggregated_csv_folder, gpu_activities_only=gpu_activities_only, api_calls_only=api_calls_only)
+    df = get_csv(
+        aggregated_csv_folder,
+        gpu_activities_only=gpu_activities_only,
+        api_calls_only=api_calls_only,
+    )
     model_nans = {}
 
     for model in df["model"].unique():
@@ -109,7 +128,9 @@ def missing_data(aggregated_csv_folder, gpu_activities_only=False, api_calls_onl
     return model_nans
 
 
-def mutually_exclusive_data(aggregated_csv_folder, gpu_activities_only=False, api_calls_only=False):
+def mutually_exclusive_data(
+    aggregated_csv_folder, gpu_activities_only=False, api_calls_only=False
+):
     """
     Returns information about the data as a dict with elements described below:
 
@@ -128,7 +149,11 @@ def mutually_exclusive_data(aggregated_csv_folder, gpu_activities_only=False, ap
     :param aggregated_csv_folder: path to the folder under ./profiles/ which contains the aggregated.csv file.
     """
 
-    model_nans = missing_data(aggregated_csv_folder, gpu_activities_only=gpu_activities_only, api_calls_only=api_calls_only)
+    model_nans = missing_data(
+        aggregated_csv_folder,
+        gpu_activities_only=gpu_activities_only,
+        api_calls_only=api_calls_only,
+    )
     num_models = len(list(model_nans.keys()))
 
     # dict of model: exclusive attributes to that model (this model has it completely and no other model has any)
@@ -147,7 +172,9 @@ def mutually_exclusive_data(aggregated_csv_folder, gpu_activities_only=False, ap
     # Only includes attributes that at least 1 model doesnt have and at least 1 model has.
     partially_exclusive = {}
 
-    for attribute in model_nans[next(iter(model_nans))].axes[0]:    # gets the first element
+    for attribute in model_nans[next(iter(model_nans))].axes[
+        0
+    ]:  # gets the first element
         models_with_complete_attribute = []
         models_with_partial_attribute = []
         models_without_attribute = []
@@ -161,7 +188,10 @@ def mutually_exclusive_data(aggregated_csv_folder, gpu_activities_only=False, ap
                 partial_attribute[model].append(attribute)
             if percent_empty == 1.0:
                 models_without_attribute.append(model)
-        if len(models_with_complete_attribute) == 1 and len(models_with_partial_attribute) == 0:
+        if (
+            len(models_with_complete_attribute) == 1
+            and len(models_with_partial_attribute) == 0
+        ):
             # only one model has this attribute
             mutually_exclusive[models_with_complete_attribute[0]].append(attribute)
         if len(models_without_attribute) == num_models:
@@ -170,7 +200,10 @@ def mutually_exclusive_data(aggregated_csv_folder, gpu_activities_only=False, ap
         if len(models_with_complete_attribute) == num_models:
             # all models have this attribute completly
             complete_attributes.append(attribute)
-        if 0 < len(models_with_complete_attribute) < num_models and len(models_without_attribute) > 0:
+        if (
+            0 < len(models_with_complete_attribute) < num_models
+            and len(models_without_attribute) > 0
+        ):
             # at least 1 model has this and at least 1 model doesn't have this attribute
             partially_exclusive[attribute] = models_with_complete_attribute
 
@@ -179,13 +212,19 @@ def mutually_exclusive_data(aggregated_csv_folder, gpu_activities_only=False, ap
         "partial_attributes": partial_attribute,
         "no_data_attributes": attributes_with_no_data,
         "complete_attributes": complete_attributes,
-        "partially_exclusive_attributes": partially_exclusive
+        "partially_exclusive_attributes": partially_exclusive,
     }
 
     return res
 
 
-def shared_data(agg_csv_folder, system_data_only=False, no_system_data=False, gpu_activities_only=False, api_calls_only=False):
+def shared_data(
+    agg_csv_folder,
+    system_data_only=False,
+    no_system_data=False,
+    gpu_activities_only=False,
+    api_calls_only=False,
+):
     """
     Return a dataframe containing only complete features that can be used for machine learning.
 
@@ -198,8 +237,12 @@ def shared_data(agg_csv_folder, system_data_only=False, no_system_data=False, gp
         raise ValueError("system_data_only and no_system_data cannot both be true.")
 
     df = get_csv(agg_csv_folder)
-    complete_attributes = mutually_exclusive_data(agg_csv_folder, gpu_activities_only=gpu_activities_only, api_calls_only=api_calls_only)["complete_attributes"]
-    df = df[complete_attributes]    # only consider complete data
+    complete_attributes = mutually_exclusive_data(
+        agg_csv_folder,
+        gpu_activities_only=gpu_activities_only,
+        api_calls_only=api_calls_only,
+    )["complete_attributes"]
+    df = df[complete_attributes]  # only consider complete data
 
     if not system_data_only and not no_system_data:
         return df
@@ -210,12 +253,14 @@ def shared_data(agg_csv_folder, system_data_only=False, no_system_data=False, gp
                 return True
         return False
 
-    system_cols = [col_name for col_name in complete_attributes if system_column(col_name)]
+    system_cols = [
+        col_name for col_name in complete_attributes if system_column(col_name)
+    ]
 
     if system_data_only:
-        system_cols.append('model')
-        system_cols.append('model_family')
-        system_cols.append('file')
+        system_cols.append("model")
+        system_cols.append("model_family")
+        system_cols.append("file")
         return df[system_cols]
 
     # else no_system_data is true
@@ -261,7 +306,7 @@ def add_indicator_columns(df):
 
     Since GPU data is split into 6 features (min, max, avg, num_calls, time_ms, time_percent),
     only 1 indicator column will be added for each of these 6 features.
-    
+
     Indicators have the name indicator_<meta_feature>.  For example, a meta
     feature is [CUDA memcpy DtoD] which is associated with features
     avg_us_[CUDA memcpy DtoD], max_ms_[CUDA memcpy DtoD], min_us_[CUDA memcpy DtoD]
@@ -269,14 +314,21 @@ def add_indicator_columns(df):
 
     There will only be one indicator per meta feature.
     """
-    prefixes = ['min_us_', 'max_ms_', 'avg_us_', 'num_calls_', 'time_ms_', 'time_percent_']
-    
+    prefixes = [
+        "min_us_",
+        "max_ms_",
+        "avg_us_",
+        "num_calls_",
+        "time_ms_",
+        "time_percent_",
+    ]
+
     def stripPrefix(col_name: str) -> str:
         for prefix in prefixes:
             if col_name.startswith(prefix):
-                return col_name[len(prefix):]
+                return col_name[len(prefix) :]
         raise ValueError
-    
+
     for col in df.columns:
         column = df[col]
         if column.isna().sum() > 0:
@@ -296,7 +348,7 @@ def add_indicator_columns(df):
 
 def add_indicator_cols_to_input(df, x: pd.Series, exclude: list = []) -> pd.Series:
     """
-    For an input x, add indicator columns to x so that it has the same 
+    For an input x, add indicator columns to x so that it has the same
     columns as df.  Replace missing values in x with mean.  Return
     new x.  Drop columns of x that are not in df.
     Excluded columns are skipped.
@@ -326,7 +378,7 @@ def add_indicator_cols_to_input(df, x: pd.Series, exclude: list = []) -> pd.Seri
                 break
         if not found:
             x[col] = 0
-    
+
     # now all indicator columns are added, fill in missing
     # values with the mean
     for col in df.columns:
@@ -338,7 +390,7 @@ def add_indicator_cols_to_input(df, x: pd.Series, exclude: list = []) -> pd.Seri
     for i in x.keys():
         if i not in df.columns:
             x = x.drop(i)
-    
+
     # sort x in order of the keys of the df.
     x = pd.DataFrame([x])
     new_df = pd.concat((df, x), ignore_index=True)
@@ -348,7 +400,14 @@ def add_indicator_cols_to_input(df, x: pd.Series, exclude: list = []) -> pd.Seri
     return result
 
 
-def all_data(agg_csv_folder, system_data_only=False, no_system_data=False, indicators_only=False, gpu_activities_only=False, api_calls_only=False):
+def all_data(
+    agg_csv_folder,
+    system_data_only=False,
+    no_system_data=False,
+    indicators_only=False,
+    gpu_activities_only=False,
+    api_calls_only=False,
+):
     """
     Return a dataframe containing all features.  Creates indicator columns for incomplete
     features, and fills NaNs with the mean of that feature.
@@ -362,7 +421,11 @@ def all_data(agg_csv_folder, system_data_only=False, no_system_data=False, indic
     if system_data_only and no_system_data:
         raise ValueError("system_data_only and no_system_data cannot both be true.")
 
-    df = get_csv(agg_csv_folder, gpu_activities_only=gpu_activities_only, api_calls_only=api_calls_only)
+    df = get_csv(
+        agg_csv_folder,
+        gpu_activities_only=gpu_activities_only,
+        api_calls_only=api_calls_only,
+    )
 
     df = add_indicator_columns(df)
 
@@ -371,9 +434,9 @@ def all_data(agg_csv_folder, system_data_only=False, no_system_data=False, indic
 
     if indicators_only:
         indicator_cols = [col for col in df.columns if col.startswith("indicator")]
-        indicator_cols.append('model')
-        indicator_cols.append('model_family')
-        indicator_cols.append('file')
+        indicator_cols.append("model")
+        indicator_cols.append("model_family")
+        indicator_cols.append("file")
         return df[indicator_cols]
 
     if not system_data_only and not no_system_data:
@@ -388,16 +451,16 @@ def all_data(agg_csv_folder, system_data_only=False, no_system_data=False, indic
     system_cols = [col_name for col_name in df.columns if system_column(col_name)]
 
     if system_data_only:
-        system_cols.append('model')
-        system_cols.append('model_family')
-        system_cols.append('file')
+        system_cols.append("model")
+        system_cols.append("model_family")
+        system_cols.append("file")
         return df[system_cols]
 
     # else no_system_data is true
     return df.drop(system_cols, axis=1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # test = shared_data("zero_noexe", system_data_only=True)
     # print(test)
     test = mutually_exclusive_data("zero_noexe_lots_models")

@@ -4,9 +4,9 @@ from typing import List, Tuple, Dict, Union
 import numpy as np
 import sys
 import copy
- 
+
 # setting path
-sys.path.append('../edge_profile')
+sys.path.append("../edge_profile")
 
 import torch
 import onnx
@@ -39,7 +39,9 @@ def convert_model(
         if model is None:
             raise ValueError("Model is not supported for quantization")
     else:
-        model = get_model(model_arch=model_arch, pretrained=pretrained, kwargs=copy.deepcopy(kwargs))
+        model = get_model(
+            model_arch=model_arch, pretrained=pretrained, kwargs=copy.deepcopy(kwargs)
+        )
 
     # convert to onnx
     model.eval()
@@ -126,7 +128,7 @@ def convert_models(
             save_folder.rmdir()
         else:
             raise print(f"Folder {str(save_folder)} already exists")
-    
+
     save_folder.mkdir(parents=True)
 
     for arch in model_archs:
@@ -167,6 +169,11 @@ if __name__ == "__main__":
     save_name = "ten_output_classes"
 
     models = all_models
-    #models = ['mobilenet_v2', "mobilenet_v3_large", "mobilenet_v3_small", 'mnasnet0_5', 'mnasnet0_75', 'mnasnet1_0', 'mnasnet1_3',
-            #   'shufflenet_v2_x0_5', 'shufflenet_v2_x1_0', 'shufflenet_v2_x1_5', 'shufflenet_v2_x2_0']
-    convert_models(models, save_folder=save_parent_folder / save_name, pretrained=False, kwargs={"num_classes": 10})
+    # models = ['mobilenet_v2', "mobilenet_v3_large", "mobilenet_v3_small", 'mnasnet0_5', 'mnasnet0_75', 'mnasnet1_0', 'mnasnet1_3',
+    #   'shufflenet_v2_x0_5', 'shufflenet_v2_x1_0', 'shufflenet_v2_x1_5', 'shufflenet_v2_x2_0']
+    convert_models(
+        models,
+        save_folder=save_parent_folder / save_name,
+        pretrained=False,
+        kwargs={"num_classes": 10},
+    )

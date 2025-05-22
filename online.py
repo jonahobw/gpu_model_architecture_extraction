@@ -52,7 +52,9 @@ class OnlineStats:
             the new array using numpy and then that updates the current stats
         """
         if batch:
-            add = self + OnlineStats.from_values(len(iterable), np.mean(iterable), np.std(iterable), 0)
+            add = self + OnlineStats.from_values(
+                len(iterable), np.mean(iterable), np.std(iterable), 0
+            )
             self.n, self.mean, self.S = add.n, add.mean, add.S
         else:
             for datum in iterable:
@@ -89,7 +91,7 @@ class OnlineStats:
     @property
     def flatvariance(self):
         # for datapoints which are arrays
-        return np.mean(self.variance+self.mean**2) - self.flatmean**2
+        return np.mean(self.variance + self.mean**2) - self.flatmean**2
 
     @property
     def flatstd(self):
@@ -115,9 +117,11 @@ class OnlineStats:
         return f"n={self.n}  mean={self.mean}  std={self.std}"
 
     def __repr__(self):
-        return f"OnlineStats.from_values(" + \
-               f"n={self.n}, mean={self.mean}, " + \
-               f"std={self.std})"
+        return (
+            f"OnlineStats.from_values("
+            + f"n={self.n}, mean={self.mean}, "
+            + f"std={self.std})"
+        )
 
     def __add__(self, other):
         """Adding can be done with int|float or other Online Stats
@@ -140,12 +144,12 @@ class OnlineStats:
             S1, S2 = self.S, other.S
             # New stats
             n = n1 + n2
-            mu = n1/n * mu1 + n2/n * mu2
-            S = (S1 + n1 * mu1*mu1) + (S2 + n2 * mu2*mu2) - n * mu*mu
+            mu = n1 / n * mu1 + n2 / n * mu2
+            S = (S1 + n1 * mu1 * mu1) + (S2 + n2 * mu2 * mu2) - n * mu * mu
             return OnlineStats.from_raw_values(n, mu, S)
         if isinstance(other, (int, float)):
             # Add a fixed amount to all values. Only changes the mean
-            return OnlineStats.from_raw_values(self.n, self.mean+other, self.S)
+            return OnlineStats.from_raw_values(self.n, self.mean + other, self.S)
         else:
             raise TypeError("Can only add other groups or numbers")
 
@@ -154,11 +158,10 @@ class OnlineStats:
 
     def __mul__(self, k):
         # Multiply all values seen by some constant
-        return OnlineStats.from_raw_values(self.n, self.mean*k, self.S*k**2)
+        return OnlineStats.from_raw_values(self.n, self.mean * k, self.S * k**2)
 
 
 class OnlineStatsMap:
-
     def __init__(self, *keys):
         self.stats = {}
         if keys is not None:
@@ -172,4 +175,4 @@ class OnlineStatsMap:
     def __str__(self):
         s = "Stats"
         for k in self.stats:
-            s += f'  {k}:  {str(self.stats[k])}'
+            s += f"  {k}:  {str(self.stats[k])}"

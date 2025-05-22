@@ -104,7 +104,7 @@ def accuracy(model, dataloader, topk=(1,), seed=None, loss_func=None, debug=None
         # Use same device as model
         device = next(model.parameters()).device
     except StopIteration:
-        device = 'cpu'
+        device = "cpu"
 
     model.eval()
 
@@ -133,10 +133,8 @@ def accuracy(model, dataloader, topk=(1,), seed=None, loss_func=None, debug=None
                 loss += loss_func(output, target).item()
             total_tested += len(input)
             for i, x in enumerate(topk):
-                running_accs[f"top{x}"] = accs[i]/total_tested
-            epoch_iter.set_postfix(
-                **running_accs
-            )
+                running_accs[f"top{x}"] = accs[i] / total_tested
+            epoch_iter.set_postfix(**running_accs)
 
     # print(f"Total inputs tested: {total_tested}")
     # print(f"Total correct: {accs}")

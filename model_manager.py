@@ -303,7 +303,9 @@ class ModelManagerBase(ABC):
         if num_epochs == 0:
             self.model.eval()
             print("Training ended, saving model.")
-            self.saveModel(replace=replace)  # this function already checks self.save_model
+            self.saveModel(
+                replace=replace
+            )  # this function already checks self.save_model
             self.config["epochs_trained"] = self.epochs_trained
             if "initialLR" not in self.config:
                 self.config["initialLR"] = lr

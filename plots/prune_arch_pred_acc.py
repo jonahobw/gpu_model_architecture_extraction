@@ -42,6 +42,7 @@ if not SAVE_FOLDER.exists():
 QUADRO_TRAIN = Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
 QUADRO_PRUNE_TEST = Path.cwd() / "victim_profiles_pruned"
 
+
 def loadFeatureRank(filename: str):
     if not filename.endswith(".json"):
         filename += ".json"
@@ -59,35 +60,54 @@ def getDF(path: Path, to_keep_path: Path = None, df_args: dict = {}):
         df = removeColumnsFromOther(keep_df, df)
     return df
 
-def generatePruneReport(quadro_train: pd.DataFrame, config: dict, model_names: List[str], topk: List[int] = [1, 5], train_size: int = None):
+
+def generatePruneReport(
+    quadro_train: pd.DataFrame,
+    config: dict,
+    model_names: List[str],
+    topk: List[int] = [1, 5],
+    train_size: int = None,
+):
     # for now, only topk will be evaluated on test dataset.
 
-    columns = ["Architecture Prediction Model Type", "Train/Test", "Train", "Test", "Test Family Accuracy"]
+    columns = [
+        "Architecture Prediction Model Type",
+        "Train/Test",
+        "Train",
+        "Test",
+        "Test Family Accuracy",
+    ]
 
     for k in topk:
-        #columns.append(f"Train Top {k}")
+        # columns.append(f"Train Top {k}")
         columns.append(f"Test Top {k}")
 
     table = pd.DataFrame(columns=columns)
 
     for model_type in model_names:
-        row_data = {"Architecture Prediction Model Type": arch_model_full_name()[model_type]}
+        row_data = {
+            "Architecture Prediction Model Type": arch_model_full_name()[model_type]
+        }
         # train model
-        model = get_arch_pred_model(model_type=model_type, df=quadro_train, kwargs={"train_size": train_size})
+        model = get_arch_pred_model(
+            model_type=model_type, df=quadro_train, kwargs={"train_size": train_size}
+        )
         train_top1 = model.evaluateTrain() * 100
         row_data["Train"] = train_top1
 
         # test
-        test_k_report = predictVictimArchs(model, QUADRO_PRUNE_TEST, save=False, topk=max(topk), verbose=False)
+        test_k_report = predictVictimArchs(
+            model, QUADRO_PRUNE_TEST, save=False, topk=max(topk), verbose=False
+        )
         k_acc = test_k_report["accuracy_k"]
 
         row_data["Test Family Accuracy"] = test_k_report["family_accuracy"] * 100
-        
+
         topk_str = ""
         for k in topk:
             row_data[f"Test Top {k}"] = k_acc[k] * 100
             topk_str += "{:.3g}/".format(k_acc[k] * 100)
-        
+
         row_data["Test"] = topk_str[:-1]
 
         row_data["Train/Test"] = "{:.3g}/{:.3g}".format(train_top1, k_acc[1] * 100)
@@ -101,11 +121,11 @@ def generatePruneReport(quadro_train: pd.DataFrame, config: dict, model_names: L
     table.T.to_csv(transpose_path)
 
     config["topk"] = topk
-    with open(SAVE_FOLDER / f"{time}.json", 'w') as f:
+    with open(SAVE_FOLDER / f"{time}.json", "w") as f:
         json.dump(config, f, indent=4)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     model_names = arch_model_names()  # all the models we want to use
 
@@ -118,11 +138,11 @@ if __name__ == '__main__':
     # if None, use all features. Else, this is a name of a feature ranking under
     # feature_ranks/
     feature_ranking_file = "rf_gpu_kernels_nomem.json"
-    feature_num = 25    # the number of features to use
+    feature_num = 25  # the number of features to use
 
     # args to pass to load training data, if feature rank file is provided,
     # then this should be an empty dict
-    df_args = {}    #{"no_system_data": True, "gpu_activities_only": True}
+    df_args = {}  # {"no_system_data": True, "gpu_activities_only": True}
 
     # substrings to remove from the dataframe, if feature rank file is provided,
     # then this should be empty
@@ -134,15 +154,15 @@ if __name__ == '__main__':
         assert len(df_remove_substrs) == 0
 
     quadro_train = getDF(QUADRO_TRAIN, df_args=df_args)
-    
+
     if feature_ranking_file is not None:
         feature_ranking = loadFeatureRank(feature_ranking_file)
         relevant_features = feature_ranking[:feature_num]
 
         quadro_train = filter_cols(quadro_train, substrs=relevant_features)
-    
+
     quadro_train = remove_cols(quadro_train, substrs=df_remove_substrs)
-    
+
     config = {
         "train_size": train_size,
         "feature_ranking_file": feature_ranking_file,
@@ -152,7 +172,10 @@ if __name__ == '__main__':
         "model_names": model_names,
     }
 
-    generatePruneReport(quadro_train=quadro_train, config=config, model_names=model_names, topk=topk, train_size=train_size)
-
-
-    
+    generatePruneReport(
+        quadro_train=quadro_train,
+        config=config,
+        model_names=model_names,
+        topk=topk,
+        train_size=train_size,
+    )

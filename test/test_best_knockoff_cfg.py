@@ -15,8 +15,15 @@ import json
 file = Path.cwd() / "test_knockoff.csv"
 df = pd.read_csv(file)
 
-parameters = ["dataset","transfer_size","sample_avg","random_policy","entropy","pretrained"]
-metrics = ["val_loss","val_acc1","val_agreement","l1_weight_bound"]
+parameters = [
+    "dataset",
+    "transfer_size",
+    "sample_avg",
+    "random_policy",
+    "entropy",
+    "pretrained",
+]
+metrics = ["val_loss", "val_acc1", "val_agreement", "l1_weight_bound"]
 
 result = {}
 for metric in metrics:

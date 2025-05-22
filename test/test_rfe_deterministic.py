@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 import sys
 import matplotlib.pyplot as plt
+
 # plt.style.use('ggplot')
 
 # setting path
@@ -41,9 +42,12 @@ def removeColumnsFromOther(keep_cols, remove_df):
     to_remove = [x for x in remove_df.columns if x not in keep_cols.columns]
     return remove_cols(remove_df, to_remove)
 
-def getDF(path: Path = None, to_keep_path: Path= None, save_path: Path = None):
+
+def getDF(path: Path = None, to_keep_path: Path = None, save_path: Path = None):
     if to_keep_path is None:
-        to_keep_path = Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
+        to_keep_path = (
+            Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
+        )
     if path is None:
         path = to_keep_path
     df = all_data(path, no_system_data=False)
@@ -79,18 +83,22 @@ def getDF(path: Path = None, to_keep_path: Path= None, save_path: Path = None):
         df.to_csv(save_path)
     return df
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 
     folder = Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
     df = getDF(path=folder)
 
-    
-    model = get_arch_pred_model("lr_rfe", df=df, kwargs={"rfe_num": 1, "verbose": False})
+    model = get_arch_pred_model(
+        "lr_rfe", df=df, kwargs={"rfe_num": 1, "verbose": False}
+    )
     ranked_features = model.featureRank(suppress_output=True)
 
     global_features = set(ranked_features)
-    
-    model2 = get_arch_pred_model("lr_rfe", df=df, kwargs={"rfe_num": 1, "verbose": False})
+
+    model2 = get_arch_pred_model(
+        "lr_rfe", df=df, kwargs={"rfe_num": 1, "verbose": False}
+    )
     ranked_features2 = model2.featureRank(suppress_output=True)
 
     assert ranked_features == ranked_features2

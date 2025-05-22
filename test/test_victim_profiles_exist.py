@@ -13,6 +13,6 @@ def gpuProfExists(gpu_type: str):
         _, conf = manager.getProfile(filters={"gpu_type": gpu_type})
         assert manager.architecture in conf["file"]
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     gpuProfExists("tesla_t4")
-    

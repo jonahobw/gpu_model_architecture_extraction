@@ -35,21 +35,19 @@ def createHiddenImportStr():
         s += f'--hidden-import="{imprt}" '
     return s
 
+
 def createAddDataStr():
     site_packs_folder = Path(site.getsitepackages()[0])
-    pkgs = [
-        "torch"
-    ]
+    pkgs = ["torch"]
     s = ""
     for pkg in pkgs:
         folder = str(site_packs_folder / pkg)
         s += f'--add-data="{folder}:." '
     return s
 
+
 def createExcludeModsStr():
-    exclude = [
-        "torch.distributions"
-    ]
+    exclude = ["torch.distributions"]
     s = ""
     for x in exclude:
         s += f'--exclude-module="{x}" '
@@ -57,8 +55,10 @@ def createExcludeModsStr():
 
 
 def create_exe():
-    command = (f"pyinstaller {createHiddenImportStr()}"# {createAddDataStr()} {createExcludeModsStr()}"
-        f" --onefile --clean model_inference.py")
+    command = (
+        f"pyinstaller {createHiddenImportStr()}"  # {createAddDataStr()} {createExcludeModsStr()}"
+        f" --onefile --clean model_inference.py"
+    )
     output = subprocess.run(shlex.split(command), stdout=sys.stdout)
     exe_file = Path.cwd() / "dist" / "model_inference.exe"
     if os.name != "nt":
@@ -89,6 +89,7 @@ def cleanup():
 
     spec_file = Path.cwd() / "model_inference.spec"
     spec_file.unlink(missing_ok=True)
+
 
 cleanup()
 try:

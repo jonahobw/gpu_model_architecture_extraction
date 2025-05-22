@@ -11,15 +11,28 @@ from model_manager import VictimModelManager, PruneModelManager, QuantizedModelM
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-model", type=str, default="resnet", required=False)
-parser.add_argument("-n", type=int, default=1, required=False,
-                    help="number of inferences")
-parser.add_argument("-gpu", type=int, default=-1, required=False,
-                    help="-1 for cpu, else number of gpu")
-parser.add_argument("-input", type=str, default="random",
-                    help="Input type to pass to model. See construct_inputs.py")
-parser.add_argument("-seed", type=int, default=42, help="Random seed for random inputs.")
-parser.add_argument("-pretrained", action='store_true', help="Use a pretrained model")
-parser.add_argument("-load_path", default=None, required=False, help="Provide a path to a model to be used.")
+parser.add_argument(
+    "-n", type=int, default=1, required=False, help="number of inferences"
+)
+parser.add_argument(
+    "-gpu", type=int, default=-1, required=False, help="-1 for cpu, else number of gpu"
+)
+parser.add_argument(
+    "-input",
+    type=str,
+    default="random",
+    help="Input type to pass to model. See construct_inputs.py",
+)
+parser.add_argument(
+    "-seed", type=int, default=42, help="Random seed for random inputs."
+)
+parser.add_argument("-pretrained", action="store_true", help="Use a pretrained model")
+parser.add_argument(
+    "-load_path",
+    default=None,
+    required=False,
+    help="Provide a path to a model to be used.",
+)
 
 
 args = parser.parse_args()
@@ -27,7 +40,7 @@ args = parser.parse_args()
 model = args.model
 model_name = args.model
 if args.load_path is not None:
-    gpu = args.gpu if args.gpu >=0 else None
+    gpu = args.gpu if args.gpu >= 0 else None
     if args.load_path.find(PruneModelManager.FOLDER_NAME) >= 0:
         manager = PruneModelManager.load(model_path=args.load_path, gpu=gpu)
         model = manager.model
@@ -45,7 +58,7 @@ else:
 
 device = torch.device("cpu")
 dev_name = "cpu"
-if args.gpu >=0:
+if args.gpu >= 0:
     device = torch.device(f"cuda:{args.gpu}")
     dev_name = f"gpu{args.gpu}"
 
@@ -59,5 +72,3 @@ for i in range(args.n):
     model(inputs)
 
 print("Completed.")
-
-

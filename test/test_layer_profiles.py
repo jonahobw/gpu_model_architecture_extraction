@@ -9,9 +9,9 @@ from pathlib import Path
 import time
 
 from utils import latest_file
- 
+
 # setting path
-sys.path.append('../edge_profile')
+sys.path.append("../edge_profile")
 
 import torch
 
@@ -20,7 +20,12 @@ from construct_input import construct_input
 
 
 def runNVProf(
-    path: Path, operation: str, seed: int = 47, n: int = 10, input: str = "0", gpu = 0,
+    path: Path,
+    operation: str,
+    seed: int = 47,
+    n: int = 10,
+    input: str = "0",
+    gpu=0,
 ):
     """
     Adds a profile file profile_{pid}.csv and associated params_{pid}.json file to
@@ -67,12 +72,15 @@ def runNVProf(
         "success": success,
         "gpu": gpu,
         "gpu_type": torch.cuda.get_device_name(0).lower().replace(" ", "_"),
-        "operation": operation
+        "operation": operation,
     }
     with open(path / f"params_{profile_num}.json", "w") as f:
         json.dump(params, f, indent=4)
 
-def executeOperation(operation: str, seed: int = 47, n: int = 10, input: str = "0", gpu = 0):
+
+def executeOperation(
+    operation: str, seed: int = 47, n: int = 10, input: str = "0", gpu=0
+):
     device = torch.device(f"cuda:{gpu}")
     dev_name = f"gpu{gpu}"
 
@@ -83,16 +91,16 @@ def executeOperation(operation: str, seed: int = 47, n: int = 10, input: str = "
         inputs = inputs.to(device)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         "-profile",
         type=bool,
-        action='store_true',
+        action="store_true",
         required=False,
         help="If provided, will invoke the profiler, this option is only provided by the program, "
-        "not the user."
+        "not the user.",
     )
     parser.add_argument(
         "-n",
@@ -135,11 +143,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.profile:
-        executeOperation(operation=args.operation, seed=args.seed, n=args.n, input=args.input, gpu=args.gpu)
+        executeOperation(
+            operation=args.operation,
+            seed=args.seed,
+            n=args.n,
+            input=args.input,
+            gpu=args.gpu,
+        )
         exit(0)
 
     gpu_name = torch.cuda.get_device_name(0).lower().replace(" ", "_")
-    
+
     # create folder for these profiles
     subfolder = args.folder
     if not subfolder:
@@ -152,6 +166,11 @@ if __name__ == '__main__':
 
     for op in OPERATIONS:
         runNVProf(
-            path=profile_folder, operation=op, seed=args.seed, n=args.n, input=args.input, gpu=args.gpu,
+            path=profile_folder,
+            operation=op,
+            seed=args.seed,
+            n=args.n,
+            input=args.input,
+            gpu=args.gpu,
         )
         time.sleep(args.sleep)

@@ -11,6 +11,7 @@ from torchvision.datasets import VisionDataset
 from torch.utils.data import DataLoader, random_split, Subset
 from torch import Generator
 
+
 def nameToDataset():
     return {
         "MNIST": datasets.MNIST,
@@ -20,13 +21,14 @@ def nameToDataset():
         "tiny-imagenet-200": TinyImageNet200,
     }
 
+
 class TinyImageNet200(datasets.ImageFolder):
     """
     Dataset for TinyImageNet200.
     Adapted from https://github.com/tribhuvanesh/knockoffnets
     """
 
-    def __init__(self, root, train = True, transform=None):
+    def __init__(self, root, train=True, transform=None):
 
         # Initialize ImageFolder
         root = Path(root) / "train" if train else "val"
@@ -38,8 +40,8 @@ class TinyImageNet200(datasets.ImageFolder):
         """Replace class names (synsets) with more descriptive labels"""
         # Load mapping
         synset_to_desc = dict()
-        fpath = Path(self.root.parent) / 'words.txt'
-        with open(fpath, 'r') as rf:
+        fpath = Path(self.root.parent) / "words.txt"
+        with open(fpath, "r") as rf:
             for line in rf:
                 synset, desc = line.strip().split(maxsplit=1)
                 synset_to_desc[synset] = desc
@@ -118,7 +120,13 @@ def dataset_builder(
     return nameToDataset()[dataset](path, **kwargs)
 
 
-def MNIST(train=True, path=None, resize=None, normalize: Tuple[List[float], List[float]] = None, deterministic: bool = False):
+def MNIST(
+    train=True,
+    path=None,
+    resize=None,
+    normalize: Tuple[List[float], List[float]] = None,
+    deterministic: bool = False,
+):
     """Thin wrapper around torchvision.datasets.CIFAR10"""
     mean, std = 0.1307, 0.3081
     normalize = transforms.Normalize(mean=(mean,), std=(std,))
@@ -127,7 +135,13 @@ def MNIST(train=True, path=None, resize=None, normalize: Tuple[List[float], List
     return dataset
 
 
-def CIFAR10(train=True, path=None, deterministic=False, resize=None, normalize: Tuple[List[float], List[float]] = None):
+def CIFAR10(
+    train=True,
+    path=None,
+    deterministic=False,
+    resize=None,
+    normalize: Tuple[List[float], List[float]] = None,
+):
     """Thin wrapper around torchvision.datasets.CIFAR10"""
     mean, std = [0.491, 0.482, 0.447], [0.247, 0.243, 0.262]
     if normalize is not None:
@@ -142,7 +156,13 @@ def CIFAR10(train=True, path=None, deterministic=False, resize=None, normalize: 
     return dataset
 
 
-def CIFAR100(train=True, path=None, resize=None, normalize: Tuple[List[float], List[float]] = None, deterministic: bool = False):
+def CIFAR100(
+    train=True,
+    path=None,
+    resize=None,
+    normalize: Tuple[List[float], List[float]] = None,
+    deterministic: bool = False,
+):
     """Thin wrapper around torchvision.datasets.CIFAR100"""
     mean, std = [0.507, 0.487, 0.441], [0.267, 0.256, 0.276]
     if normalize is not None:
@@ -159,7 +179,13 @@ def CIFAR100(train=True, path=None, resize=None, normalize: Tuple[List[float], L
     return dataset
 
 
-def TinyImageNet(train=True, path=None, resize=None, normalize: Tuple[List[float], List[float]] = None, deterministic: bool = False):
+def TinyImageNet(
+    train=True,
+    path=None,
+    resize=None,
+    normalize: Tuple[List[float], List[float]] = None,
+    deterministic: bool = False,
+):
     """Sets up the tiny imagenet dataset."""
     mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
     if normalize is not None:
@@ -176,7 +202,13 @@ def TinyImageNet(train=True, path=None, resize=None, normalize: Tuple[List[float
     return dataset
 
 
-def ImageNet(train=True, path=None, resize=None, normalize: Tuple[List[float], List[float]] = None, deterministic: bool = False):
+def ImageNet(
+    train=True,
+    path=None,
+    resize=None,
+    normalize: Tuple[List[float], List[float]] = None,
+    deterministic: bool = False,
+):
     """Thin wrapper around torchvision.datasets.ImageNet"""
     # ImageNet loading from files can produce benign EXIF errors
     import warnings
@@ -199,7 +231,7 @@ def ImageNet(train=True, path=None, resize=None, normalize: Tuple[List[float], L
 
 
 class Dataset:
-    #todo implement lazy loading of datasets
+    # todo implement lazy loading of datasets
 
     name_mapping = {
         "mnist": MNIST,
@@ -208,7 +240,13 @@ class Dataset:
         "imagenet": ImageNet,
         "tiny-imagenet-200": TinyImageNet,
     }
-    num_classes_map = {"mnist": 10, "cifar10": 10, "cifar100": 100, "imagenet": 1000, "tiny-imagenet-200": 200}
+    num_classes_map = {
+        "mnist": 10,
+        "cifar10": 10,
+        "cifar100": 100,
+        "imagenet": 1000,
+        "tiny-imagenet-200": 200,
+    }
 
     def __init__(
         self,
@@ -277,12 +315,16 @@ class Dataset:
             "lazy_load": lazy_load,
             "indices": indices,
         }
-    
+
     @property
     def train_data(self):
         if self._train_data is None:
             # this executes the first time the property is used
-            self._train_data = self.name_mapping[self.name](resize=self.resize, normalize=self.normalize, deterministic=self.deterministic)
+            self._train_data = self.name_mapping[self.name](
+                resize=self.resize,
+                normalize=self.normalize,
+                deterministic=self.deterministic,
+            )
             if self.data_subset_percent is not None:
                 first_amount = int(len(self._train_data) * self.data_subset_percent)
                 second_amount = len(self._train_data) - first_amount
@@ -294,7 +336,7 @@ class Dataset:
             if self.indices is not None:
                 self._train_data = Subset(self._train_data, self.indices[0])
         return self._train_data
-    
+
     @property
     def train_dl(self):
         if self._train_dl is None:
@@ -307,12 +349,17 @@ class Dataset:
                 num_workers=self.workers,
             )
         return self._train_dl
-    
+
     @property
     def val_data(self):
         if self._val_data is None:
             # this executes the first time self.train_data is used
-            self._val_data = self.name_mapping[self.name](train=False, resize=self.resize, normalize=self.normalize, deterministic=self.deterministic)
+            self._val_data = self.name_mapping[self.name](
+                train=False,
+                resize=self.resize,
+                normalize=self.normalize,
+                deterministic=self.deterministic,
+            )
             if self.data_subset_percent is not None:
                 first_amount = int(len(self._val_data) * self.data_subset_percent)
                 second_amount = len(self._val_data) - first_amount
@@ -324,7 +371,7 @@ class Dataset:
             if self.indices is not None:
                 self._val_data = Subset(self._val_data, self.indices[1])
         return self._val_data
-    
+
     @property
     def val_dl(self):
         if self._val_dl is None:
@@ -337,7 +384,7 @@ class Dataset:
                 num_workers=self.workers,
             )
         return self._val_dl
-    
+
     @property
     def train_acc_data(self):
         if self._train_acc_data is None:
@@ -356,7 +403,7 @@ class Dataset:
             if self.indices is not None:
                 self._train_acc_data = Subset(self._train_acc_data, self.indices[0])
         return self._train_acc_data
-    
+
     @property
     def train_acc_dl(self):
         if self._train_acc_dl is None:
@@ -370,7 +417,9 @@ class Dataset:
             )
         return self._train_acc_dl
 
-    def classBalance(self, dataset: Union[VisionDataset, Subset], show=True) -> Dict[int, int]:
+    def classBalance(
+        self, dataset: Union[VisionDataset, Subset], show=True
+    ) -> Dict[int, int]:
         if isinstance(dataset, Subset):
             result = dict(Counter(dataset.dataset.targets))
         else:

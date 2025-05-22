@@ -10,7 +10,7 @@ sys.path.append("../edge_profile")
 from arch_pred_accuracy import loadReport, saveFeatureRank
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     to_combine = ["ab", "lr", "rf"]
 
     total_rank = {}
@@ -27,12 +27,10 @@ if __name__ == '__main__':
                 total_rank[feature] += i
             else:
                 total_rank[feature] = i
-    
+
     combined_rank = [x[0] for x in sorted(total_rank.items(), key=lambda x: x[1])]
-    saveFeatureRank(combined_rank, metadata={"files": combined_rank_files}, save_name=f"{save_name}.json")
-    
-
-    
-
-            
-    
+    saveFeatureRank(
+        combined_rank,
+        metadata={"files": combined_rank_files},
+        save_name=f"{save_name}.json",
+    )

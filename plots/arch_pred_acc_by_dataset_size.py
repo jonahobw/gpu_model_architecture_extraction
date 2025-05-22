@@ -29,13 +29,14 @@ from experiments import predictVictimArchs
 from config import SYSTEM_SIGNALS
 from arch_pred_accuracy import getDF
 
-rc('font',**{'family':'serif','serif':['Times'], 'size': 14})
-rc('figure', **{'figsize': (5, 4)})
+rc("font", **{"family": "serif", "serif": ["Times"], "size": 14})
+rc("figure", **{"figsize": (5, 4)})
 
 REPORT_FOLDER = Path(__file__).parent.absolute() / "arch_pred_acc_by_dataset_size"
 REPORT_FOLDER.mkdir(exist_ok=True)
 plot_folder = REPORT_FOLDER / "plots"
 plot_folder.mkdir(exist_ok=True)
+
 
 def loadReport(filename: str, feature_rank: bool = False):
     if not filename.endswith(".json"):
@@ -67,7 +68,7 @@ def generateReport(
 
     if not save_report_name.endswith(".json"):
         save_report_name += ".json"
-    
+
     if model_names is None:
         model_names = arch_model_names()  # all the models we want to use
 
@@ -84,16 +85,16 @@ def generateReport(
         }
 
     for i, dataset_size in enumerate(x_axis):
-        print(f"Running {num_experiments} experiments with {dataset_size} dataset size.")
+        print(
+            f"Running {num_experiments} experiments with {dataset_size} dataset size."
+        )
         for model_name in model_names:
             kwargs = report[model_name]["kwargs"].copy()
             kwargs["train_size"] = dataset_size * len(df["model"].unique())
             kwargs["test_size"] = len(df) - kwargs["train_size"]
             for exp in range(num_experiments):
-                model = get_arch_pred_model(
-                    model_name, df=df, kwargs=kwargs
-                )
-                assert dataset_size == len(model.x_tr)/ model.num_classes
+                model = get_arch_pred_model(model_name, df=df, kwargs=kwargs)
+                assert dataset_size == len(model.x_tr) / model.num_classes
                 report[model_name]["train_acc"][i][exp] = model.evaluateTrain()
                 report[model_name]["val_acc"][i][exp] = model.evaluateTest()
                 report[model_name]["test_acc"][i][exp] = predictVictimArchs(
@@ -101,9 +102,15 @@ def generateReport(
                 )["accuracy_k"][1]
                 if model.deterministic:
                     # only need to run one experiment, copy the result to the array
-                    report[model_name]["train_acc"][i] = np.full((num_experiments), report[model_name]["train_acc"][i][exp])
-                    report[model_name]["test_acc"][i] = np.full((num_experiments), report[model_name]["test_acc"][i][exp])
-                    report[model_name]["val_acc"][i] = np.full((num_experiments), report[model_name]["val_acc"][i][exp])
+                    report[model_name]["train_acc"][i] = np.full(
+                        (num_experiments), report[model_name]["train_acc"][i][exp]
+                    )
+                    report[model_name]["test_acc"][i] = np.full(
+                        (num_experiments), report[model_name]["test_acc"][i][exp]
+                    )
+                    report[model_name]["val_acc"][i] = np.full(
+                        (num_experiments), report[model_name]["val_acc"][i][exp]
+                    )
                     break
 
     for model_name in report:
@@ -127,9 +134,7 @@ def generateReport(
         def json_handler(x):
             if isinstance(x, np.ndarray):
                 return x.tolist()
-            raise TypeError(
-                "Unserializable object {} of type {}".format(x, type(x))
-            )
+            raise TypeError("Unserializable object {} of type {}".format(x, type(x)))
 
         save_path = REPORT_FOLDER / save_report_name
         with open(save_path, "w") as f:
@@ -158,7 +163,10 @@ def plotFromReport(
             plt.plot(x_axis, report[model_name][f"{dataset}_mean"], label=label)
             minus_std = []
             plus_std = []
-            for mean, std in zip(report[model_name][f"{dataset}_mean"], report[model_name][f"{dataset}_std"]):
+            for mean, std in zip(
+                report[model_name][f"{dataset}_mean"],
+                report[model_name][f"{dataset}_std"],
+            ):
                 minus_std.append(mean - std)
                 plus_std.append(mean + std)
             plt.fill_between(
@@ -167,14 +175,14 @@ def plotFromReport(
                 plus_std,
                 alpha=0.2,
             )
-    #plt.rcParams["figure.figsize"] = (10, 10)
+    # plt.rcParams["figure.figsize"] = (10, 10)
     plt.tight_layout()
     plt.legend(loc="lower right")
     plt.xlabel("Number of Profiles per Architecture in Training Dataset")
 
     x_axis_lim = max(x_axis) if xlim_upper is None else xlim_upper
 
-    interval = (x_axis_lim // 7)
+    interval = x_axis_lim // 7
     ticks = [x for x in range(0, x_axis_lim, interval)]
     ticks[0] = 1
     ticks.append(x_axis_lim)
@@ -207,7 +215,7 @@ if __name__ == "__main__":
     step_size = 1
     dataset_start = 1
     # the upper limit on number of profiles per architecture in training set
-    # should not be above since we have 50 profiles, a 75/25 split is 
+    # should not be above since we have 50 profiles, a 75/25 split is
     # 38/12, so number of training profiles is limited 1-38
     dataset_cap = 38
 
@@ -221,11 +229,11 @@ if __name__ == "__main__":
         True  # if true, load report from file, if false, generate report and save
     )
     # plotting
-    plot = True    # whether or not to plot
+    plot = True  # whether or not to plot
     plot_model_names = model_names
-    plot_datasets = ['test'] #['val', 'train', 'test']
+    plot_datasets = ["test"]  # ['val', 'train', 'test']
     xlim_upper = None
-    title=False
+    title = False
 
     # ---------------------------------------------------------------------
 
@@ -250,7 +258,7 @@ if __name__ == "__main__":
     else:
         # load report
         report = loadReport(report_name)
-    
+
     if plot:
         plotFromReport(
             report=report,

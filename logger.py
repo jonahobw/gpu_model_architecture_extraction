@@ -7,7 +7,6 @@ import torch
 
 
 class CSVLogger:
-
     def __init__(self, folder, columns, append: bool = True, name: str = None):
         """General purpose CSV Logger
         Initialized with a set of columns, it then has two operations
@@ -25,7 +24,7 @@ class CSVLogger:
         file_existed = file.exists()
         if file_existed and not append:
             raise FileExistsError
-        self.file = open(file, 'a+')
+        self.file = open(file, "a+")
         self.columns = columns
         self.values = {}
         self.writer = csv.writer(self.file)
@@ -39,7 +38,7 @@ class CSVLogger:
     def futureWrite(self, kwargs: dict):
         """Store the call for the future"""
         self.to_write.append(kwargs)
-    
+
     def flush(self):
         """Write all future writes (from calls to self.futureWrite())"""
         for kwargs in self.to_write:
@@ -64,13 +63,11 @@ class CSVLogger:
                 raise ValueError(f"{k} not in columns {self.columns}")
 
     def update(self):
-        """Take current values and write a row in the CSV
-        """
+        """Take current values and write a row in the CSV"""
         row = [self.values.get(c, "") for c in self.columns]
         self.writer.writerow(row)
         self.file.flush()
 
     def close(self):
-        """Close the file descriptor for the CSV
-        """
+        """Close the file descriptor for the CSV"""
         self.file.close()

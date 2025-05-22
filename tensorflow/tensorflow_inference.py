@@ -9,34 +9,38 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-model", type=str, default="resnet50", required=False)
-parser.add_argument("-n", type=int, default=1, required=False,
-                    help="number of inferences")
-parser.add_argument("-gpu", type=int, default=-1, required=False,
-                    help="-1 for cpu, else number of gpu")
+parser.add_argument(
+    "-n", type=int, default=1, required=False, help="number of inferences"
+)
+parser.add_argument(
+    "-gpu", type=int, default=-1, required=False, help="-1 for cpu, else number of gpu"
+)
 # parser.add_argument("-input", type=str, default="random",
 #                     help="Input type to pass to model. See construct_inputs.py")
 # parser.add_argument("-seed", type=int, default=42, help="Random seed for random inputs.")
 # parser.add_argument("-pretrained", action='store_true', help="Use a pretrained model")
 # parser.add_argument("-load_path", default=None, required=False, help="Provide a path to a model to be used.")
-parser.add_argument("-debug", default=False, help="Prints which device completes each operation")
+parser.add_argument(
+    "-debug", default=False, help="Prints which device completes each operation"
+)
 
 args = parser.parse_args()
 
 MODEL_MAP = {
-    #"alexnet": tf.keras.applications.,
-    #"resnet18": tf.keras.applications.,
-    #"resnet34": tf.keras.applications.,
+    # "alexnet": tf.keras.applications.,
+    # "resnet18": tf.keras.applications.,
+    # "resnet34": tf.keras.applications.,
     "resnet50": tf.keras.applications.ResNet50,
     "resnet101": tf.keras.applications.ResNet101,
     "resnet152": tf.keras.applications.ResNet152,
-    #"resnext50_32x4d": tf.keras.applications.,
-    #"resnext101_32x8d": tf.keras.applications.,
-    #"wide_resnet50_2": tf.keras.applications.,
-    #"wide_resnet101_2": tf.keras.applications.,
-    #"vgg11": tf.keras.applications.,
-    #"vgg11_bn": tf.keras.applications.,
-    #"vgg13": tf.keras.applications.,
-    #"vgg13_bn": tf.keras.applications.,
+    # "resnext50_32x4d": tf.keras.applications.,
+    # "resnext101_32x8d": tf.keras.applications.,
+    # "wide_resnet50_2": tf.keras.applications.,
+    # "wide_resnet101_2": tf.keras.applications.,
+    # "vgg11": tf.keras.applications.,
+    # "vgg11_bn": tf.keras.applications.,
+    # "vgg13": tf.keras.applications.,
+    # "vgg13_bn": tf.keras.applications.,
     "vgg16": tf.keras.applications.VGG16,
     # "vgg16_bn": tf.keras.applications.,
     # "vgg19_bn": tf.keras.applications.,
@@ -61,12 +65,14 @@ MODEL_MAP = {
     # "shufflenet_v2_x2_0": tf.keras.applications.
 }
 
+
 def getDeviceName(gpu_num: int) -> str:
     if gpu_num < 0:
         return "/device:CPU:0"
     return f"/device:GPU:{gpu_num}"
 
-assert args.gpu <= len(tf.config.list_physical_devices('GPU'))
+
+assert args.gpu <= len(tf.config.list_physical_devices("GPU"))
 if args.debug:
     tf.debugging.set_log_device_placement(True)
 

@@ -4,9 +4,10 @@ This file validates that tensorflow can run on GPU.
 
 import tensorflow as tf
 import numpy as np
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
-#tf.debugging.set_log_device_placement(True)
+print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
+
+# tf.debugging.set_log_device_placement(True)
 
 # pretrained_model = tf.keras.applications.MobileNetV3Large()
 pretrained_model = tf.keras.applications.ResNet50()

@@ -2,22 +2,36 @@ import json
 from multiprocessing import freeze_support
 from pathlib import Path
 import sys
+
 # setting path
-sys.path.append('../edge_profile')
+sys.path.append("../edge_profile")
 
 
 import torch
 
 from model_metrics import correct
-from model_manager import SurrogateModelManager, VictimModelManager, getVictimSurrogateModels
+from model_manager import (
+    SurrogateModelManager,
+    VictimModelManager,
+    getVictimSurrogateModels,
+)
 
 
 def load(path):
     return SurrogateModelManager.load(path)
-    
-def newSurrogate(victim_path, pretrained = True, save_model = True):
+
+
+def newSurrogate(victim_path, pretrained=True, save_model=True):
     architecture = vict_path.parent.parent.name
-    return SurrogateModelManager(victim_path, architecture=architecture, arch_conf=1.0, arch_pred_model_name="rf", save_model=save_model, pretrained=pretrained)
+    return SurrogateModelManager(
+        victim_path,
+        architecture=architecture,
+        arch_conf=1.0,
+        arch_pred_model_name="rf",
+        save_model=save_model,
+        pretrained=pretrained,
+    )
+
 
 def testAgreement(surrogate_manager):
     # dl = surrogate_manager.victim_model.dataset.val_dl
@@ -37,7 +51,8 @@ def testAgreement(surrogate_manager):
     agreement = correct(yhat, victim_targets)
     print(agreement)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     freeze_support()
     manager_paths = getVictimSurrogateModels()
     for vict_path in manager_paths:
@@ -49,7 +64,7 @@ if __name__ == '__main__':
     # l1_weight_bound = surrogate_manager.getL1WeightNorm(surrogate_manager.victim_model)
     # print(l1_weight_bound)
     # testAgreement(surrogate_manager=surrogate_manager)
-    
+
     # a.loadKnockoffTransferSet(
     #     dataset_name="tiny-imagenet-200",
     #     transfer_size=1000,

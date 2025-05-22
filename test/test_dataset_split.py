@@ -1,14 +1,15 @@
 from pathlib import Path
 import sys
- 
+
 # setting path
-sys.path.append('../edge_profile')
+sys.path.append("../edge_profile")
 
 import datasets
 
 from model_manager import VictimModelManager, SurrogateModelManager
 from datasets import Dataset
 from utils import latest_file
+
 
 def validateClassBalance():
     a = Dataset("cifar10", data_subset_percent=0.5)
@@ -18,7 +19,6 @@ def validateClassBalance():
 
     a.classBalance(a.val_data)
 
-
     b = Dataset("cifar10", data_subset_percent=0.5, idx=1)
     b.classBalance(a.train_acc_data)
 
@@ -26,7 +26,8 @@ def validateClassBalance():
 
     b.classBalance(a.val_data)
 
-def checkAccuracy(gpu: int=-1):
+
+def checkAccuracy(gpu: int = -1):
     arch = "mnasnet1_3"
 
     paths = VictimModelManager.getModelPaths()
@@ -38,18 +39,20 @@ def checkAccuracy(gpu: int=-1):
     surrogate_manager = SurrogateModelManager.load(surrogate_path, gpu=gpu)
 
     print(f"Victim {arch} on its own train set:")
-    surrogate_manager.victim_model.topKAcc(surrogate_manager.victim_model.dataset.train_acc_dl)
+    surrogate_manager.victim_model.topKAcc(
+        surrogate_manager.victim_model.dataset.train_acc_dl
+    )
 
     print(f"Surrogate {arch} on victim's train set:")
     surrogate_manager.topKAcc(surrogate_manager.victim_model.dataset.train_acc_dl)
 
     print(f"Victim {arch} on its own test set:")
-    surrogate_manager.victim_model.topKAcc(surrogate_manager.victim_model.dataset.val_dl)
+    surrogate_manager.victim_model.topKAcc(
+        surrogate_manager.victim_model.dataset.val_dl
+    )
 
     print(f"Surrogate {arch} on victim's test set:")
     surrogate_manager.topKAcc(surrogate_manager.victim_model.dataset.val_dl)
-
-
 
     print(f"Victim {arch} on surrogate's train set:")
     surrogate_manager.victim_model.topKAcc(surrogate_manager.dataset.train_acc_dl)
@@ -62,6 +65,7 @@ def checkAccuracy(gpu: int=-1):
 
     print(f"Surrogate {arch} on its own test set:")
     surrogate_manager.topKAcc(surrogate_manager.dataset.val_dl)
+
 
 def check_dataset_split():
     a = Dataset("cifar10", data_subset_percent=0.1)
@@ -92,7 +96,6 @@ def check_dataset_split():
     assert not set(b.train_data.indices).intersection(set(a.train_data.indices))
     assert not set(b.val_data.indices).intersection(set(a.val_data.indices))
 
-
     # check for repetition
     d = Dataset("cifar10", data_subset_percent=0.1)
     assert d.train_data.indices == a.train_data.indices
@@ -102,9 +105,8 @@ def check_dataset_split():
     assert e.train_data.indices == b.train_data.indices
     assert e.val_data.indices == b.val_data.indices
 
-
     print("All checks valid")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     exit(0)
