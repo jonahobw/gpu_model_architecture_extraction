@@ -5,8 +5,8 @@ generate profiles on them.
 import argparse
 import json
 import sys
-from pathlib import Path
 import time
+from pathlib import Path
 
 from utils import latest_file
 

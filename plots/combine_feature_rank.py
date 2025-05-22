@@ -9,7 +9,6 @@ sys.path.append("../edge_profile")
 
 from arch_pred_accuracy import loadReport, saveFeatureRank
 
-
 if __name__ == "__main__":
     to_combine = ["ab", "lr", "rf"]
 

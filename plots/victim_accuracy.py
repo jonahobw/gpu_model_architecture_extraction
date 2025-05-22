@@ -1,7 +1,7 @@
 from pathlib import Path
-import numpy as np
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 plt.style.use("ggplot")
 
@@ -10,8 +10,8 @@ import sys
 # setting path
 sys.path.append("../edge_profile")
 
-from model_manager import VictimModelManager
 from config import MODELS
+from model_manager import VictimModelManager
 
 if __name__ == "__main__":
     data = []

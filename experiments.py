@@ -1,25 +1,21 @@
-from pathlib import Path
 import datetime
-import time
-import traceback
-from typing import List, Dict
 import json
 import shutil
+import time
+import traceback
+from pathlib import Path
+from typing import Dict, List
 
-from get_model import all_models, quantized_models, name_to_family, getModelParams
 import config
-from model_manager import (
-    VictimModelManager,
-    SurrogateModelManager,
-    PruneModelManager,
-    QuantizedModelManager,
-    StructuredPruneModelManager,
-    StructuredPruneModelManager,
-)
-from architecture_prediction import get_arch_pred_model, ArchPredBase
-from utils import latest_file, dict_to_str
+from architecture_prediction import ArchPredBase, get_arch_pred_model
 from format_profiles import parse_one_profile
+from get_model import (all_models, getModelParams, name_to_family,
+                       quantized_models)
 from logger import CSVLogger
+from model_manager import (PruneModelManager, QuantizedModelManager,
+                           StructuredPruneModelManager, SurrogateModelManager,
+                           VictimModelManager)
+from utils import dict_to_str, latest_file
 
 
 def trainOneVictim(

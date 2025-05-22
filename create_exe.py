@@ -2,13 +2,13 @@
 Creates an exe based on model_inference.py for your OS.
 This is the exe file that can be used for profiling one inference.
 """
-import sys
-import shutil
 import os
-import subprocess
 import shlex
-from pathlib import Path
+import shutil
 import site
+import subprocess
+import sys
+from pathlib import Path
 
 
 def createHiddenImportStr():

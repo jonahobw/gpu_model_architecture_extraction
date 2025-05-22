@@ -2,11 +2,12 @@
 From https://github.com/jonahobw/shrinkbench/blob/master/metrics/accuracy.py
 """
 
+import random
+
 import numpy as np
 import torch
 from torch.backends import cudnn
 from tqdm import tqdm
-import random
 
 
 def correct(output, target, topk=(1,)):

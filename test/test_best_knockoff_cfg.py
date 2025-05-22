@@ -8,9 +8,10 @@ each metric and finds the best configuration to
 minimize or maximize that metric. Essentially it
 is a grid search.
 """
-from pathlib import Path
-import pandas as pd
 import json
+from pathlib import Path
+
+import pandas as pd
 
 file = Path.cwd() / "test_knockoff.csv"
 df = pd.read_csv(file)

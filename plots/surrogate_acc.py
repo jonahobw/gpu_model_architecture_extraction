@@ -67,10 +67,10 @@ Training metrics:
 
 import datetime
 from pathlib import Path
-from typing import List, Dict, Union, Tuple
-import numpy as np
+from typing import Dict, List, Tuple, Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import rc
 
 # plt.style.use('ggplot')
@@ -83,14 +83,11 @@ import sys
 # setting path
 sys.path.append("../edge_profile")
 
-from model_manager import (
-    SurrogateModelManager,
-    VictimModelManager,
-    getVictimSurrogateModels,
-    getModelsFromSurrogateTrainStrategies,
-)
 from config import MODELS
-from get_model import name_to_family, model_families
+from get_model import model_families, name_to_family
+from model_manager import (SurrogateModelManager, VictimModelManager,
+                           getModelsFromSurrogateTrainStrategies,
+                           getVictimSurrogateModels)
 
 SAVE_FOLDER = Path(__file__).parent.absolute() / "surrogate_acc"
 SAVE_FOLDER.mkdir(exist_ok=True)

@@ -1,12 +1,15 @@
 """Downloads a dataset to <current working dir>/datasets/<name>"""
 
+import io
+import shutil
+import zipfile
 from argparse import ArgumentParser
-import requests, zipfile, io, shutil
 from pathlib import Path
 
-from tqdm import tqdm
+import requests
 from torchvision import datasets
 from torchvision.datasets import ImageFolder
+from tqdm import tqdm
 
 torchvision_datasets = {
     "MNIST": datasets.MNIST,

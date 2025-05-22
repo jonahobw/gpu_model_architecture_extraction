@@ -1,17 +1,19 @@
-import json
-from pathlib import Path
-from typing import List, Tuple, Dict, Union
-import numpy as np
-import sys
 import copy
+import json
+import sys
+from pathlib import Path
+from typing import Dict, List, Tuple, Union
+
+import numpy as np
 
 # setting path
 sys.path.append("../edge_profile")
 
-import torch
 import onnx
 import onnxruntime
-from get_model import get_model, get_quantized_model, all_models
+import torch
+
+from get_model import all_models, get_model, get_quantized_model
 
 
 def convert_model(

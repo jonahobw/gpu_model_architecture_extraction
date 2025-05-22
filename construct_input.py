@@ -2,8 +2,9 @@
 Generates an input to feed to a model.  Seed can be specified for random inputs.
 Configuration of input size comes from config.py
 """
-import config
 import torch
+
+import config
 
 VALID_INPUTS = {"random": torch.randn, "0": torch.zeros, "1": torch.ones}
 

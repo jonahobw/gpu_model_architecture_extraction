@@ -1,7 +1,7 @@
 import json
+import sys
 from multiprocessing import freeze_support
 from pathlib import Path
-import sys
 
 # setting path
 sys.path.append("../edge_profile")
@@ -9,12 +9,9 @@ sys.path.append("../edge_profile")
 
 import torch
 
+from model_manager import (SurrogateModelManager, VictimModelManager,
+                           getVictimSurrogateModels)
 from model_metrics import correct
-from model_manager import (
-    SurrogateModelManager,
-    VictimModelManager,
-    getVictimSurrogateModels,
-)
 
 if __name__ == "__main__":
     freeze_support()

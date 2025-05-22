@@ -1,17 +1,15 @@
-from pathlib import Path
-import sys
 import json
+import sys
+from pathlib import Path
 from typing import List
+
 from tqdm import tqdm
 
 sys.path.append("../edge_profile")
 
-from architecture_prediction import (
-    get_arch_pred_model,
-    arch_model_names,
-)
-from data_engineering import filter_cols, all_data
-from format_profiles import parse_one_profile, findProfiles
+from architecture_prediction import arch_model_names, get_arch_pred_model
+from data_engineering import all_data, filter_cols
+from format_profiles import findProfiles, parse_one_profile
 from get_model import name_to_family
 
 

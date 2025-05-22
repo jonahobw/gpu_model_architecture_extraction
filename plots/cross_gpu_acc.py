@@ -15,29 +15,21 @@ The features used and dataset size are configurable.
 
 import datetime
 import json
+import sys
 from pathlib import Path
 from typing import List
-import pandas as pd
 
-import sys
+import pandas as pd
 
 # plt.style.use('ggplot')
 
 # setting path
 sys.path.append("../edge_profile")
 
-from data_engineering import (
-    filter_cols,
-    all_data,
-    remove_cols,
-    removeColumnsFromOther,
-)
-from architecture_prediction import (
-    arch_model_full_name,
-    get_arch_pred_model,
-    ArchPredBase,
-    arch_model_names,
-)
+from architecture_prediction import (ArchPredBase, arch_model_full_name,
+                                     arch_model_names, get_arch_pred_model)
+from data_engineering import (all_data, filter_cols, remove_cols,
+                              removeColumnsFromOther)
 from experiments import predictVictimArchs
 from model_manager import VictimModelManager
 

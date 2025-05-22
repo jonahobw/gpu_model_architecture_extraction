@@ -1,5 +1,5 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # setting path
 sys.path.append("../edge_profile")

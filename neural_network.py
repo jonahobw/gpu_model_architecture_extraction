@@ -3,16 +3,15 @@ Implements a fully connected N-layer neural network.
 Capability for training with decreasing learning rate.
 Used for predicting the model architecture from gpu profiles
 """
-import torch
-from torch import nn
-import torch.nn.functional as F
-import torch.optim as optim
-import pandas as pd
-import numpy as np
-
 import time
 
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn.functional as F
+import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
+from torch import nn
 
 from model_metrics import correct
 

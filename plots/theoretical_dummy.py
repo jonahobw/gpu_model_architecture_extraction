@@ -12,29 +12,24 @@ models on clean profiles (no noise added) and
 then evaluate the accuracy on profiles with 
 noise added. 
 """
-from pathlib import Path
-import sys
-import json
-from typing import List
 import datetime
-
-import pandas as pd
-import numpy as np
+import json
+import sys
+from pathlib import Path
+from typing import List
 
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from matplotlib import rc
 
 # setting path
 sys.path.append("../edge_profile")
 
 from arch_pred_accuracy import getDF
-from data_engineering import (
-    filter_cols,
-)
-from architecture_prediction import (
-    get_arch_pred_model,
-    arch_model_names,
-)
+
+from architecture_prediction import arch_model_names, get_arch_pred_model
+from data_engineering import filter_cols
 
 rc("font", **{"family": "serif", "serif": ["Times"], "size": 12})
 rc("figure", **{"figsize": (6, 4)})

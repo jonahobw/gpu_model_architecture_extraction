@@ -1,12 +1,12 @@
-from pathlib import Path
-from smtplib import SMTPException, SMTP_SSL
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import time
 import json
+import ssl
+import time
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from pathlib import Path
+from smtplib import SMTP_SSL, SMTPException
 
-from utils import timer, dict_to_str
+from utils import dict_to_str, timer
 
 
 class EmailSender:

@@ -1,8 +1,8 @@
 import json
 import sys
 from typing import List
-import numpy as np
 
+import numpy as np
 import torch
 from torch.nn.utils import prune
 

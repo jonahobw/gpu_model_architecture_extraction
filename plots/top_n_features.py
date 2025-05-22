@@ -10,16 +10,15 @@ and whether or not to plot the std is configurable.
 
 import datetime
 import json
+import sys
 from pathlib import Path
 from typing import List, Tuple
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from matplotlib import rc
 from sklearn.preprocessing import MinMaxScaler, Normalizer, StandardScaler
-import numpy as np
-
-import sys
 
 # plt.style.use('ggplot')
 rc("font", **{"family": "serif", "serif": ["Times"]})
@@ -27,8 +26,8 @@ rc("font", **{"family": "serif", "serif": ["Times"]})
 # setting path
 sys.path.append("../edge_profile")
 
-from get_model import model_families, name_to_family, all_models
 from data_engineering import all_data, filter_cols
+from get_model import all_models, model_families, name_to_family
 
 SAVE_FOLDER = Path(__file__).parent.absolute() / "top_n_features"
 SAVE_FOLDER.mkdir(exist_ok=True)

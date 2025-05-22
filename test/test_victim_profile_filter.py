@@ -1,6 +1,5 @@
 # test victim profile filtering
 import json
-
 import sys
 
 # setting path

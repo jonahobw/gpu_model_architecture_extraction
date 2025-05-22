@@ -1,10 +1,9 @@
 """Uses pyprof to profile in white box setting."""
 import argparse
 
+import pyprof
 import torch
 import torchvision.models as models
-
-import pyprof
 
 pyprof.init()
 

@@ -3,11 +3,13 @@ Runs N inferences on a model A (maybe pretrained) on GPU K with inputs X.
 This file is turned into an executable and profiling is enabled while running the executable.
 """
 import argparse
+
 import torch
 
 from construct_input import construct_input
 from get_model import get_model
-from model_manager import VictimModelManager, PruneModelManager, QuantizedModelManager
+from model_manager import (PruneModelManager, QuantizedModelManager,
+                           VictimModelManager)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-model", type=str, default="resnet", required=False)

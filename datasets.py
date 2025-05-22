@@ -2,14 +2,14 @@
 adapted from https://github.com/jonahobw/shrinkbench/blob/master/datasets/datasets.py
 """
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
-from collections import Counter
 
-from torchvision import transforms, datasets
-from torchvision.datasets import VisionDataset
-from torch.utils.data import DataLoader, random_split, Subset
 from torch import Generator
+from torch.utils.data import DataLoader, Subset, random_split
+from torchvision import datasets, transforms
+from torchvision.datasets import VisionDataset
 
 
 def nameToDataset():

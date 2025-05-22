@@ -4,13 +4,13 @@ and on the y axis, accuracy of the model on the test and train set, with one lin
 """
 
 import json
+import sys
 from pathlib import Path
 from typing import List
-import pandas as pd
-import numpy as np
 
-import sys
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from matplotlib import rc
 
 # plt.style.use('ggplot')
@@ -18,16 +18,12 @@ from matplotlib import rc
 # setting path
 sys.path.append("../edge_profile")
 
-from data_engineering import (
-    filter_cols,
-)
-from architecture_prediction import (
-    get_arch_pred_model,
-    arch_model_names,
-)
-from experiments import predictVictimArchs
-from config import SYSTEM_SIGNALS
 from arch_pred_accuracy import getDF
+
+from architecture_prediction import arch_model_names, get_arch_pred_model
+from config import SYSTEM_SIGNALS
+from data_engineering import filter_cols
+from experiments import predictVictimArchs
 
 rc("font", **{"family": "serif", "serif": ["Times"], "size": 14})
 rc("figure", **{"figsize": (5, 4)})

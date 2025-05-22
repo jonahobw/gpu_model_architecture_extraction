@@ -1,9 +1,8 @@
 """
 Configuration of profile collection and model construction.
 """
-from get_model import name_to_family
 from email_sender import EmailSender
-
+from get_model import name_to_family
 
 VALID_MODELS = list(name_to_family.keys())
 

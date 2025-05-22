@@ -1,5 +1,5 @@
-import torchvision.models as models
 import torch
+import torchvision.models as models
 
 alexnet = "alexnet", ["alexnet"]
 resnet = "resnet", [

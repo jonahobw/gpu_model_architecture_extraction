@@ -4,24 +4,24 @@ Runs an executable to generate and save profiles.
 Some parameters come from command line and some from config.py.  TODO - make everything come from config.
 """
 
+import argparse
 import json
 import os
-import shutil
-import sys
-import subprocess
-from pathlib import Path
-import argparse
-import shlex
-import time
 import random
+import shlex
+import shutil
+import subprocess
+import sys
+import time
 import traceback
+from pathlib import Path
 from typing import List
 
 import torch
 
 import config
-from utils import getSystem, latest_file, dict_to_str
 from format_profiles import validProfile
+from utils import dict_to_str, getSystem, latest_file
 
 
 def run_command(folder, command):

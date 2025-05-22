@@ -1,13 +1,12 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # setting path
 sys.path.append("../edge_profile")
 
 import datasets
-
-from model_manager import VictimModelManager, SurrogateModelManager
 from datasets import Dataset
+from model_manager import SurrogateModelManager, VictimModelManager
 from utils import latest_file
 
 

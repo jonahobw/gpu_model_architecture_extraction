@@ -6,41 +6,31 @@ of architecture prediction model.
 """
 
 import json
-from pathlib import Path
 import shutil
-from typing import Dict, List, Union
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
-
 import sys
+from pathlib import Path
+from typing import Dict, List, Union
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from sklearn.metrics import top_k_accuracy_score
+from tqdm import tqdm
 
 # plt.style.use('ggplot')
 
 # setting path
 sys.path.append("../edge_profile")
 
-from data_engineering import (
-    filter_cols,
-    shared_data,
-    get_data_and_labels,
-    all_data,
-    add_indicator_cols_to_input,
-    remove_cols,
-    removeColumnsFromOther,
-)
-from format_profiles import parse_one_profile
-from architecture_prediction import (
-    get_arch_pred_model,
-    ArchPredBase,
-    RFArchPred,
-    arch_model_names,
-    arch_model_full_name,
-)
-from experiments import predictVictimArchs
+from architecture_prediction import (ArchPredBase, RFArchPred,
+                                     arch_model_full_name, arch_model_names,
+                                     get_arch_pred_model)
 from config import SYSTEM_SIGNALS
+from data_engineering import (add_indicator_cols_to_input, all_data,
+                              filter_cols, get_data_and_labels, remove_cols,
+                              removeColumnsFromOther, shared_data)
+from experiments import predictVictimArchs
+from format_profiles import parse_one_profile
 from utils import latest_file
 
 PROFILE_FOLDER = Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"

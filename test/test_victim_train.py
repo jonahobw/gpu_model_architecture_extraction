@@ -1,6 +1,6 @@
+import sys
 from pathlib import Path
 from typing import Callable
-import sys
 
 import torch
 from tqdm import tqdm
@@ -9,8 +9,8 @@ from tqdm import tqdm
 sys.path.append("../edge_profile")
 
 from datasets import Dataset
-from get_model import getModelParams, get_model
-from model_metrics import correct, accuracy
+from get_model import get_model, getModelParams
+from model_metrics import accuracy, correct
 from online import OnlineStats
 
 # parameters

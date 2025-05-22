@@ -7,38 +7,33 @@ the surrogate model can be trained using labels from the victim model.
 
 import datetime
 import json
-import shutil
-from pathlib import Path
 import random
+import shutil
 import sys
 import time
-from typing import Callable, Dict, List, Tuple, Union
 from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Callable, Dict, List, Tuple, Union
 
+import numpy as np
+import pandas as pd
 import torch
+from cleverhans.torch.attacks.projected_gradient_descent import \
+    projected_gradient_descent
 from torch.nn.utils import prune
 from torch.utils.data import DataLoader
-import numpy as np
 from tqdm import tqdm
-from cleverhans.torch.attacks.projected_gradient_descent import (
-    projected_gradient_descent,
-)
-import pandas as pd
 
-from get_model import (
-    get_model,
-    getModelParams,
-    get_quantized_model,
-    quantized_models,
-)
-from datasets import Dataset
-from logger import CSVLogger
-from online import OnlineStats
-from model_metrics import correct, accuracy, both_correct
-from collect_profiles import run_command, generateExeName
-from utils import latest_file, latestFileFromList, checkDict
-from format_profiles import parse_one_profile, avgProfiles
 from architecture_prediction import ArchPredBase
+from collect_profiles import generateExeName, run_command
+from datasets import Dataset
+from format_profiles import avgProfiles, parse_one_profile
+from get_model import (get_model, get_quantized_model, getModelParams,
+                       quantized_models)
+from logger import CSVLogger
+from model_metrics import accuracy, both_correct, correct
+from online import OnlineStats
+from utils import checkDict, latest_file, latestFileFromList
 
 
 def loadModel(path: Path, model: torch.nn.Module, device: torch.device = None) -> None:

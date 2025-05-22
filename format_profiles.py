@@ -3,13 +3,15 @@ Aggregates nvprof profile data into one csv file.
 Also has capability to validate nvprof success and class balance.
 """
 
-import json
-from typing import Dict, List, Mapping, Tuple, Union
-from pathlib import Path
-import pandas as pd
-import numpy as np
-from get_model import name_to_family
 import argparse
+import json
+from pathlib import Path
+from typing import Dict, List, Mapping, Tuple, Union
+
+import numpy as np
+import pandas as pd
+
+from get_model import name_to_family
 
 
 def check_profile(profile_csv):

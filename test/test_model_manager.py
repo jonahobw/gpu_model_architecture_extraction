@@ -1,17 +1,12 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # setting path
 sys.path.append("../edge_profile")
 
-from model_manager import (
-    VictimModelManager,
-    SurrogateModelManager,
-    PruneModelManager,
-    QuantizedModelManager,
-    trainOneVictim,
-    continueVictimTrain,
-)
+from model_manager import (PruneModelManager, QuantizedModelManager,
+                           SurrogateModelManager, VictimModelManager,
+                           continueVictimTrain, trainOneVictim)
 
 if __name__ == "__main__":
     arch = "mobilenet_v2"

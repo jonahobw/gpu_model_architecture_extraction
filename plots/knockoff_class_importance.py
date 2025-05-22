@@ -7,16 +7,16 @@ must all sample from the same dataset.
 
 import datetime
 import json
-from pathlib import Path
 import shutil
-from typing import List, Union
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
-
 import sys
+from pathlib import Path
+from typing import List, Union
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from matplotlib import rc
+from tqdm import tqdm
 
 # plt.style.use('ggplot')
 

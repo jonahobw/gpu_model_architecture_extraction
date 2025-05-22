@@ -1,31 +1,25 @@
 """Takes cleaned profile data and runs classifiers on it to predict model architecture."""
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Tuple
+
 import numpy as np
-from abc import ABC, abstractmethod
-
-from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import NearestCentroid, KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler, Normalizer
-from sklearn.feature_selection import RFE
-from sklearn.metrics import top_k_accuracy_score
 import pandas as pd
+from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import (LabelEncoder, MinMaxScaler, StandardScaler)
 
-from data_engineering import (
-    shared_data,
-    get_data_and_labels,
-    all_data,
-    add_indicator_cols_to_input,
-    remove_cols,
-    softmax,
-)
-from neural_network import Net
 from config import SYSTEM_SIGNALS
+from data_engineering import (add_indicator_cols_to_input, all_data,
+                              get_data_and_labels, remove_cols, shared_data,
+                              softmax)
+from neural_network import Net
 
 
 class ArchPredBase(ABC):
@@ -140,16 +134,6 @@ class ArchPredBase(ABC):
         for index, row in data.iterrows():
             table.loc[index] = self.preprocessInput(row, expand=False)
         return self.model.score(table, y)
-
-    # def evaluateTopKNumpy(self, k: int, train=True):
-    #     x = self.x_tr
-    #     y = self.y_train
-    #     if not train:
-    #         x = self.x_test
-    #         y = self.y_test
-    #     results = []
-    #     for i in range(1, k+1):
-    #         results.append(top_k_accuracy_score(y, self.get))
 
 
 class RFEArchPred(ArchPredBase):
@@ -651,13 +635,3 @@ def arch_model_full_name():
         RFArchPred.NAME: RFArchPred.FULL_NAME,
         ABArchPred.NAME: ABArchPred.FULL_NAME,
     }
-
-
-if __name__ == "__main__":
-    # neural_net("zero_noexe_lots_models", shared_data_only=False, indicator_only=True)
-    # logistic_reg("zero_noexe_lots_models")
-    # logistic_reg("zero_noexe_lots_models", system_data_only=True)
-    # logistic_reg("zero_noexe_lots_models", no_system_data=True)
-    # logistic_reg("zero_noexe_lots_models", shared_data_only=False, no_system_data=True)
-    # logistic_reg("zero_noexe_lots_models", shared_data_only=False)
-    exit(0)

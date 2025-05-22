@@ -4,18 +4,15 @@ model_manager.py such that it is not backwards compatible
 with previous config formats.
 """
 
-from pathlib import Path
 import json
 import sys
+from pathlib import Path
 
 # setting path
 sys.path.append("../edge_profile")
 
-from model_manager import (
-    VictimModelManager,
-    SurrogateModelManager,
-    getVictimSurrogateModels,
-)
+from model_manager import (SurrogateModelManager, VictimModelManager,
+                           getVictimSurrogateModels)
 
 
 def addConfig(args: dict):
