@@ -1,32 +1,67 @@
-"""Downloads a dataset to <current working dir>/datasets/<name>"""
+"""Dataset download and preparation utilities.
+
+This scipt provides functionality for downloading and preparing common image datasets
+including MNIST, CIFAR10, CIFAR100, ImageNet, and TinyImageNet-200. It supports:
+- Automatic download of datasets to a local directory
+- Progress tracking during downloads
+- Dataset-specific formatting and organization
+- Support for both torchvision and custom datasets
+
+Dependencies:
+    - requests: For downloading datasets
+    - torchvision: For dataset implementations
+    - tqdm: For progress bars
+    - zipfile: For handling compressed datasets
+
+Usage: python download_dataset.py -name <dataset_name>
+"""
 
 import io
 import shutil
 import zipfile
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Dict, List, Type, Union
 
 import requests
 from torchvision import datasets
 from torchvision.datasets import ImageFolder
 from tqdm import tqdm
 
-torchvision_datasets = {
+
+# Dictionary mapping dataset names to their torchvision dataset classes
+torchvision_datasets: Dict[str, Type[ImageFolder]] = {
     "MNIST": datasets.MNIST,
     "CIFAR10": datasets.CIFAR10,
     "CIFAR100": datasets.CIFAR100,
     "ImageNet": datasets.ImageNet,
 }
 
-supported_datasets = ["tiny-imagenet-200"] + list(torchvision_datasets.keys())
+# List of all supported datasets
+supported_datasets: List[str] = ["tiny-imagenet-200"] + list(torchvision_datasets.keys())
 
-download_path = Path.cwd() / "datasets"
+# Default download path
+download_path: Path = Path.cwd() / "datasets"
 
+# Create download directory if it doesn't exist
 if not download_path.exists():
     download_path.mkdir(parents=True, exist_ok=True)
 
 
-def download(url: str, fname: str, chunk_size=1024):
+def download(url: str, fname: Union[str, Path], chunk_size: int = 1024) -> requests.Response:
+    """Download a file from a URL with progress tracking.
+    
+    Args:
+        url: URL to download from
+        fname: Path to save the file to
+        chunk_size: Size of chunks to download at a time
+        
+    Returns:
+        Response object from the download request
+        
+    Raises:
+        AssertionError: If download fails (status code != 200)
+    """
     if not isinstance(fname, str):
         fname = str(fname)
     resp = requests.get(url, stream=True)
@@ -47,15 +82,31 @@ def download(url: str, fname: str, chunk_size=1024):
     return resp
 
 
-def downloadDataset(dataset_name):
+def downloadDataset(dataset_name: str) -> None:
+    """Download and prepare a dataset.
+    
+    This function handles both torchvision datasets and custom datasets like TinyImageNet-200.
+    For torchvision datasets, it uses the built-in download functionality.
+    For TinyImageNet-200, it downloads the zip file and formats the directory structure.
+    
+    Args:
+        dataset_name: Name of the dataset to download
+        
+    Raises:
+        ValueError: If dataset_name is not in supported_datasets
+    """
     if dataset_name not in supported_datasets:
         raise ValueError(
             f"{dataset_name} not supported.  Supported datasets are {supported_datasets}."
         )
     dataset_path = download_path / dataset_name
     print(f"Downloading {dataset_name} ...")
+    
+    # Handle torchvision datasets
     if dataset_name in torchvision_datasets:
         torchvision_datasets[dataset_name](root=dataset_path, download=True)
+    
+    # Handle TinyImageNet-200 dataset
     if dataset_name == "tiny-imagenet-200":
         file = download_path / "tiny-imagenet-200.zip"
         if not file.exists():
@@ -67,22 +118,18 @@ def downloadDataset(dataset_name):
         z.extractall(dataset_path.parent)
         Path(file).unlink()
 
-        # format the image folder from /class/images/n01443537_0.JPEG
-        # to get rid of images folder, resulting in /class/n01443537_0.JPEG
+        # Format training data directory structure
         print("Formatting training data ...")
         for class_folder in tqdm((dataset_path / "train").glob("*")):
             if not class_folder.is_dir():
                 class_folder.unlink()
-            # text_files = [x for x in class_folder.glob("*.txt")]
-            # for text_file in text_files:
-            #     text_file.unlink()
             img_folder = class_folder / "images"
             if img_folder.exists():
                 for img in img_folder.glob("*JPEG"):
                     img.rename(dataset_path / "train" / class_folder.name / img.name)
                 shutil.rmtree(img_folder)
 
-        # format the validation folder
+        # Format validation data directory structure
         val_folder = dataset_path / "val"
         annotation_file = val_folder / "val_annotations.txt"
         file_to_label = {}
@@ -93,8 +140,7 @@ def downloadDataset(dataset_name):
                 words = line.split("\t")
                 file_to_label[words[0]] = words[1]
 
-        # Create subfolders (if not present) for validation images based on label,
-        # and move images into the respective folders
+        # Create subfolders for validation images based on label
         print("Formatting validation data ...")
         for img, folder in tqdm(file_to_label.items()):
             img_file = val_folder / "images" / img
@@ -108,13 +154,13 @@ def downloadDataset(dataset_name):
 
 
 if __name__ == "__main__":
-    a = ArgumentParser()
-    a.add_argument(
+    parser = ArgumentParser(description="Download and prepare a dataset")
+    parser.add_argument(
         "-name",
         required=True,
         type=str,
         help=f"The name of the dataset, currently supports {supported_datasets}",
     )
-    args = a.parse_args()
+    args = parser.parse_args()
 
     downloadDataset(args.name)

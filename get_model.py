@@ -1,6 +1,40 @@
+"""
+Provides utilities for working with PyTorch vision models and their configurations.
+
+This module provides functionality to:
+1. Load and configure various PyTorch vision models
+2. Support model quantization
+3. Modify model architectures for different classification tasks
+4. Manage model families and their variants
+
+Dependencies:
+    - torch: Core PyTorch library
+    - torchvision.models: Pre-trained vision models
+
+Example Usage:
+    ```python
+    # Load a pre-trained model
+    model = get_model("resnet50", pretrained=True)
+    
+    # Load a model with custom configuration
+    model = get_model("vgg16", pretrained=False, kwargs={"num_classes": 10})
+    
+    # Get quantized version of a model
+    quantized_model = get_quantized_model("mobilenet_v2")
+    ```
+
+Note:
+    - Models are organized into families (e.g., ResNet, VGG, etc.)
+    - Each model family has specific architectural variants
+    - Some models support quantization
+    - Custom configurations can be applied through kwargs
+"""
+
 import torch
 import torchvision.models as models
+from typing import Dict, List, Tuple, Optional, Union, Any
 
+# Model family definitions with their variants
 alexnet = "alexnet", ["alexnet"]
 resnet = "resnet", [
     "resnet18",
@@ -35,6 +69,7 @@ shufflenet = "shufflenet", [
     "shufflenet_v2_x2_0",
 ]
 
+# List of all model families
 model_families = [
     alexnet,
     resnet,
@@ -47,21 +82,39 @@ model_families = [
     shufflenet,
 ]
 
-name_to_family = {}
+# Create mapping from model name to family
+name_to_family: Dict[str, str] = {}
 for family, family_models in model_families:
     for model in family_models:
         name_to_family[model] = family
 
-all_models = []
+# List of all supported models
+all_models: List[str] = []
 for i in model_families:
     all_models.extend(i[1])
 
-quantized_models = [
+# List of models that support quantization
+quantized_models: List[str] = [
     x for x in list(name_to_family.keys()) if hasattr(models.quantization, x)
 ]
 
 
-def getModelParams(model_arch: str):
+def getModelParams(model_arch: str) -> Dict[str, Any]:
+    """
+    Returns model-specific parameters and configurations.
+
+    Provides default configurations for various models including:
+    - Learning rates
+    - Input sizes
+    - Optimizer choices
+    - Model-specific kwargs
+
+    Args:
+        model_arch: Name of the model architecture
+
+    Returns:
+        Dict[str, Any]: Dictionary containing model parameters and configurations
+    """
     model_params = {
         "googlenet": {"kwargs": {"aux_logits": False}},
         "alexnet": {"input_size": 224, "lr": 0.01},
@@ -85,8 +138,30 @@ def getModelParams(model_arch: str):
     return model_params.get(model_arch, {})
 
 
-def get_model(model_arch: str, pretrained=False, kwargs={}):
-    """If pretrained is true, does not pass kwargs"""
+def get_model(
+    model_arch: str,
+    pretrained: bool = False,
+    kwargs: Dict[str, Any] = None,
+) -> torch.nn.Module:
+    """
+    Loads a PyTorch vision model with specified configuration.
+
+    Args:
+        model_arch: Name of the model architecture
+        pretrained: Whether to load pre-trained weights
+        kwargs: Additional arguments to pass to the model constructor
+
+    Returns:
+        torch.nn.Module: The constructed model
+
+    Raises:
+        ValueError: If the model architecture is not supported
+
+    Note:
+        If pretrained is True, kwargs are not passed to the model constructor
+        to ensure compatibility with pre-trained weights.
+    """
+        
     model_arch = model_arch.lower()
     if model_arch not in name_to_family:
         raise ValueError(f"Model {model_arch} not supported")
@@ -107,11 +182,24 @@ def get_model(model_arch: str, pretrained=False, kwargs={}):
     return getattr(models, model_arch)(pretrained=pretrained, **kwargs)
 
 
-def get_quantized_model(model_arch: str, kwargs={}):
+def get_quantized_model(
+    model_arch: str,
+    kwargs: Dict[str, Any] = None,
+) -> Optional[torch.nn.Module]:
     """
-    Returns quantized version of the model from
-    torchvision.models.quantization.
-    If model is not supported, returns None.
+    Loads a quantized version of a PyTorch vision model.
+
+    Args:
+        model_arch: Name of the model architecture
+        kwargs: Additional arguments to pass to the model constructor
+
+    Returns:
+        Optional[torch.nn.Module]: The quantized model, or None if quantization
+            is not supported for the given architecture
+
+    Note:
+        Only models that support quantization in torchvision.models.quantization
+        can be loaded. Check quantized_models list for supported architectures.
     """
     model_arch = model_arch.lower()
     if hasattr(models.quantization, model_arch):
@@ -128,16 +216,36 @@ def get_quantized_model(model_arch: str, kwargs={}):
 
 
 def fixLastLayer(
-    model: torch.nn.Module, architecture: str, num_classes: int, finetune: bool = False
+    model: torch.nn.Module,
+    architecture: str,
+    num_classes: int,
+    finetune: bool = False,
 ) -> bool:
-    # implements finetuning changing the last layer see here
-    # https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
+    """
+    Modifies the last layer of a model for a different number of classes.
+
+    Supports various model architectures and handles their specific layer structures.
+    Can optionally freeze all layers except the last one for fine-tuning.
+
+    Args:
+        model: The model to modify
+        architecture: Name of the model architecture
+        num_classes: Number of output classes
+        finetune: If True, freezes all layers except the last one
+
+    Returns:
+        bool: True if the modification was successful, False otherwise
+
+    Note:
+        This function implements the fine-tuning approach described in:
+        https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
+    """
     print(f"Setting number of classes for {architecture} to {num_classes} ...")
     if finetune:
         for param in model.parameters():
             param.requires_grad = False
 
-    supported_models = all_models  # ["mnasnet1_3"]
+    supported_models = all_models
     if architecture not in supported_models:
         return False
     family = name_to_family[architecture]

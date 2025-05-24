@@ -1,37 +1,65 @@
 """
-From https://github.com/jonahobw/shrinkbench/blob/master/metrics/accuracy.py
+Metrics for evaluating model performance and accuracy.
+
+This module provides functions for computing various metrics to evaluate model performance,
+including top-k accuracy, agreement between models, and loss calculations.
+
+Adapted from https://github.com/jeffrey-xiao/model-extraction/blob/main/model_metrics.py
+
+Example Usage:
+    ```python
+    # Compute top-1 and top-5 accuracy
+    accuracies = accuracy(model, dataloader, topk=(1, 5))
+    top1_acc, top5_acc = accuracies
+
+    # Check agreement between two models
+    agreement = both_correct(model1_output, model2_output, targets, topk=(1,))
+    ```
 """
 
 import random
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from torch.backends import cudnn
+from torch.nn.modules.loss import _Loss
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
-def correct(output, target, topk=(1,)):
-    """Computes how many correct outputs with respect to targets
+def correct(
+    output: torch.Tensor,
+    target: torch.Tensor,
+    topk: Tuple[int, ...] = (1,)
+) -> List[int]:
+    """
+    Compute the number of correct predictions for each top-k value.
 
-    Does NOT compute accuracy but just a raw amount of correct
-    outputs given target labels. This is done for each value in
-    topk. A value is considered correct if target is in the topk
-    highest values of output.
-    The values returned are upperbounded by the given batch size
+    This function calculates how many predictions are correct for each specified
+    top-k value. A prediction is considered correct if the target label is among
+    the top-k highest values in the output.
 
-    [description]
-
-    Arguments:
-        output {torch.Tensor} -- Output prediction of the model
-        target {torch.Tensor} -- Target labels from data
-
-    Keyword Arguments:
-        topk {iterable} -- [Iterable of values of k to consider as correct] (default: {(1,)})
+    Args:
+        output (torch.Tensor): Model output predictions of shape (batch_size, num_classes)
+        target (torch.Tensor): Target labels of shape (batch_size,)
+        topk (Tuple[int, ...]): Tuple of k values to consider for correctness.
+            Defaults to (1,).
 
     Returns:
-        List(int) -- Number of correct values for each topk
-    """
+        List[int]: Number of correct predictions for each top-k value.
+            The length of the list matches the length of topk.
 
+    Example:
+        ```python
+        output = torch.tensor([[0.1, 0.8, 0.1], [0.7, 0.2, 0.1]])  # 2 samples, 3 classes
+        target = torch.tensor([1, 0])  # True labels
+        correct_preds = correct(output, target, topk=(1, 2))
+        # Returns [1, 2] meaning:
+        # - 1 correct prediction in top-1
+        # - 2 correct predictions in top-2
+        ```
+    """
     with torch.no_grad():
         maxk = max(topk)
         # Only need to do topk for highest k, reuse for the rest
@@ -46,9 +74,41 @@ def correct(output, target, topk=(1,)):
         return res
 
 
-def both_correct(output1, output2, target, topk=(1,)):
-    """Similar to correct() but for 2 models.  Returns the number of predictions that both models
-    predicted correctly."""
+def both_correct(
+    output1: torch.Tensor,
+    output2: torch.Tensor,
+    target: torch.Tensor,
+    topk: Tuple[int, ...] = (1,)
+) -> List[int]:
+    """
+    Compute the number of predictions that both models get correct.
+
+    This function calculates how many predictions are correct for both models
+    simultaneously for each specified top-k value. A prediction is considered
+    correct if both models have the target label among their top-k highest values.
+
+    Args:
+        output1 (torch.Tensor): First model's output predictions of shape (batch_size, num_classes)
+        output2 (torch.Tensor): Second model's output predictions of shape (batch_size, num_classes)
+        target (torch.Tensor): Target labels of shape (batch_size,)
+        topk (Tuple[int, ...]): Tuple of k values to consider for correctness.
+            Defaults to (1,).
+
+    Returns:
+        List[int]: Number of predictions that both models get correct for each top-k value.
+            The length of the list matches the length of topk.
+
+    Example:
+        ```python
+        output1 = torch.tensor([[0.1, 0.8, 0.1], [0.7, 0.2, 0.1]])
+        output2 = torch.tensor([[0.2, 0.7, 0.1], [0.8, 0.1, 0.1]])
+        target = torch.tensor([1, 0])
+        agreement = both_correct(output1, output2, target, topk=(1, 2))
+        # Returns [1, 2] meaning:
+        # - 1 prediction where both models are correct in top-1
+        # - 2 predictions where both models are correct in top-2
+        ```
+    """
     with torch.no_grad():
         maxk = max(topk)
         # Only need to do topk for highest k, reuse for the rest
@@ -70,22 +130,49 @@ def both_correct(output1, output2, target, topk=(1,)):
         return res
 
 
-def accuracy(model, dataloader, topk=(1,), seed=None, loss_func=None, debug=None):
-    """Compute accuracy/loss of a model over a dataloader for various topk
+def accuracy(
+    model: torch.nn.Module,
+    dataloader: DataLoader,
+    topk: Tuple[int, ...] = (1,),
+    seed: Optional[int] = None,
+    loss_func: Optional[_Loss] = None,
+    debug: Optional[int] = None
+) -> np.ndarray:
+    """
+    Compute model accuracy and loss over a dataset.
 
-    Arguments:
-        model {torch.nn.Module} -- Network to evaluate
-        dataloader {torch.utils.data.DataLoader} -- Data to iterate over
+    This function evaluates a model's performance by computing accuracy metrics
+    for specified top-k values and optionally computing loss. It supports
+    setting random seeds for reproducibility and can be run in debug mode.
 
-    Keyword Arguments:
-        topk {iterable} -- [Iterable of values of k to consider as correct] (default: {(1,)})
-        loss_func {torch.nn._Loss} -- function to compute the loss
-        seed {int} -- if provided, sets the random seeds of python, pytorch, and numpy
+    Args:
+        model (torch.nn.Module): Model to evaluate
+        dataloader (DataLoader): DataLoader containing the evaluation dataset
+        topk (Tuple[int, ...]): Tuple of k values to compute accuracy for.
+            Defaults to (1,).
+        seed (Optional[int]): Random seed for reproducibility. If provided, sets
+            seeds for Python, PyTorch, and NumPy. Defaults to None.
+        loss_func (Optional[_Loss]): Loss function to compute. If provided, loss
+            will be appended to the returned accuracies. Defaults to None.
+        debug (Optional[int]): If provided, only process this many batches.
+            Defaults to None.
 
     Returns:
-        List(float) -- List of accuracies for each topk
-    """
+        np.ndarray: Array containing accuracies for each top-k value. If loss_func
+            is provided, the loss value is appended to the end of the array.
 
+    Example:
+        ```python
+        # Compute top-1 and top-5 accuracy with cross entropy loss
+        metrics = accuracy(
+            model=model,
+            dataloader=val_loader,
+            topk=(1, 5),
+            loss_func=torch.nn.CrossEntropyLoss()
+        )
+        top1_acc, top5_acc, loss = metrics
+        ```
+    """
     if seed is not None:
         if torch.cuda.is_available():
             torch.cuda.manual_seed(seed)
@@ -121,7 +208,6 @@ def accuracy(model, dataloader, topk=(1,), seed=None, loss_func=None, debug=None
     epoch_iter.set_description("Model Accuracy")
 
     with torch.no_grad():
-
         for i, (input, target) in enumerate(epoch_iter):
             if debug is not None and i > debug:
                 break
@@ -136,9 +222,6 @@ def accuracy(model, dataloader, topk=(1,), seed=None, loss_func=None, debug=None
             for i, x in enumerate(topk):
                 running_accs[f"top{x}"] = accs[i] / total_tested
             epoch_iter.set_postfix(**running_accs)
-
-    # print(f"Total inputs tested: {total_tested}")
-    # print(f"Total correct: {accs}")
 
     # Normalize over data length
     loss /= total_tested

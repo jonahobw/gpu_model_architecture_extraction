@@ -1,7 +1,25 @@
-"""
-Runs an executable to generate and save profiles.
+"""Runs an executable to generate and save profiles.
 
-Some parameters come from command line and some from config.py.  TODO - make everything come from config.
+This module provides functionality to collect GPU profiles by running model inference
+with various configurations. It supports both PyTorch and TensorFlow models, and can
+generate profiles with different input types and random seeds.
+
+Dependencies:
+    - torch: For GPU device information
+    - subprocess: For running external commands
+    - pathlib: For path manipulation
+    - config: For configuration settings
+    - format_profiles: For profile validation
+    - utils: For utility functions
+
+Example Usage:
+    ```python
+    # Run profiling with default settings
+    python collect_profiles.py -n 10 -i 50 -gpu 0 -input random
+    
+    # Run profiling for specific models
+    python collect_profiles.py -models resnet50 vgg16 -n 5 -i 20
+    ```
 """
 
 import argparse
@@ -15,7 +33,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, Optional, Union, Dict, Any
 
 import torch
 
@@ -24,34 +42,36 @@ from format_profiles import validProfile
 from utils import dict_to_str, getSystem, latest_file
 
 
-def run_command(folder, command):
-    """Runs a command which is assumed to add a new profile to <folder>.  Then validate the profile."""
+def run_command(folder: Path, command: str) -> Tuple[bool, Path]:
+    """Runs a command which is assumed to add a new profile to <folder>. Then validate the profile.
+    
+    Args:
+        folder: Directory where the profile will be saved
+        command: Command to execute for profiling
+        
+    Returns:
+        Tuple of (is_valid_profile, profile_file_path)
+    """
     # should be a blocking call, so the latest file is valid.
-    output = subprocess.run(shlex.split(command), stdout=sys.stdout)
+    subprocess.run(shlex.split(command), stdout=sys.stdout)
     profile_file = latest_file(folder)
     return validProfile(profile_file), profile_file
 
 
-def run_command_popen(folder, command, model_type):
-    """
-    DOESN'T WORK, USE run_command() INSTEAD. Uses subprocess.Popen() instead of subprocess.run() to get the process id.
-
-    The reason this does not work is because the command run is nvprof, and nvprof starts another process
-    which is the actual executable with another process id.
-    """
-    process = subprocess.Popen(shlex.split(command))
-    process.wait()
-
-    process_id = process.pid
-    profile_file = folder / f"{model_type}{process_id}.csv"
-    if not profile_file.exists():
-        raise FileNotFoundError(
-            f"File {profile_file} does not exist and cannot be validated."
-        )
-    return validProfile(profile_file), profile_file
-
 
 def generateExeName(use_exe: bool, use_tf: bool) -> str:
+    """Generate the executable name based on configuration.
+    
+    Args:
+        use_exe: Whether to use compiled executable
+        use_tf: Whether to use TensorFlow
+        
+    Returns:
+        Path to executable or Python command
+        
+    Raises:
+        AssertionError: If both use_exe and use_tf are True
+    """
     if use_tf:
         assert not use_exe
         return "python " + str(

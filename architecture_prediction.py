@@ -1,7 +1,32 @@
-"""Takes cleaned profile data and runs classifiers on it to predict model architecture."""
+"""Takes cleaned profile data and runs classifiers on it to predict model architecture.
+
+This module provides a framework for predicting GPU model architectures based on profile data.
+It implements various machine learning classifiers including neural networks, logistic regression,
+random forests, and more.
+
+Dependencies:
+    - numpy: For numerical operations
+    - pandas: For data manipulation
+    - scikit-learn: For machine learning models
+    - torch: For neural network implementation (optional)
+
+Example Usage:
+    ```python
+    from architecture_prediction import get_arch_pred_model
+    
+    # Get a logistic regression model
+    model = get_arch_pred_model('lr', df=your_dataframe)
+    
+    # Make predictions
+    prediction, confidence = model.predict(input_data)
+    
+    # Get top 3 predictions
+    top_3 = model.topK(input_data, k=3)
+    ```
+"""
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Union, Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -23,15 +48,30 @@ from neural_network import Net
 
 
 class ArchPredBase(ABC):
+    """Base class for architecture prediction models.
+    
+    This abstract base class defines the interface and common functionality
+    for all architecture prediction models.
+    
+    Args:
+        df: Input DataFrame containing profile data
+        name: Name of the model
+        label: Column name for the target variable (default: "model")
+        verbose: Whether to print progress information
+        deterministic: Whether the model should be deterministic
+        train_size: Size of training set (optional)
+        test_size: Size of test set (optional)
+    """
+    
     def __init__(
         self,
-        df,
+        df: pd.DataFrame,
         name: str,
-        label=None,
-        verbose=True,
-        deterministic=True,
-        train_size=None,
-        test_size=None,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        deterministic: bool = True,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ) -> None:
         if label is None:
             label = "model"
@@ -62,7 +102,16 @@ class ArchPredBase(ABC):
         self.model = None
         self.deterministic = deterministic
 
-    def preprocessInput(self, x: pd.Series, expand: bool = True):
+    def preprocessInput(self, x: pd.Series, expand: bool = True) -> np.ndarray:
+        """Preprocess input data for prediction.
+        
+        Args:
+            x: Input data series
+            expand: Whether to expand dimensions for batch processing
+            
+        Returns:
+            Preprocessed numpy array
+        """
         x = add_indicator_cols_to_input(
             self.data, x, exclude=["file", "model", "model_family"]
         )
@@ -72,30 +121,61 @@ class ArchPredBase(ABC):
         return x
 
     @abstractmethod
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores for each class.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def predict(self, x: pd.Series, preprocess=True) -> Tuple[str, float]:
+    def predict(self, x: pd.Series, preprocess: bool = True) -> Tuple[str, float]:
+        """Make a prediction for the input data.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Tuple of (predicted class, confidence score)
+        """
         raise NotImplementedError
 
-    def topK(self, x: pd.Series, k: int = 3, preprocess=True) -> List[str]:
-        """A list of the topK classes predicted with most likely classes first."""
+    def topK(self, x: pd.Series, k: int = 3, preprocess: bool = True) -> List[str]:
+        """Get top K predictions for the input data.
+        
+        Args:
+            x: Input data series
+            k: Number of top predictions to return
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            List of top K predicted classes, ordered by confidence
+        """
         conf_scores = self.getConfidenceScores(x, preprocess=preprocess)
-        # adapted from
-        # https://stackoverflow.com/questions/6910641/how-do-i-get-indices-of-n-maximum-values-in-a-numpy-array
         indices = np.argpartition(conf_scores, -k)[-k:]
-        # sort by highest confidence first
         indices = indices[np.argsort(np.array(conf_scores)[indices])][::-1]
         return self.label_encoder.inverse_transform(indices)
 
     def topKConf(
-        self, x: pd.Series, k: int = 3, preprocess=True
+        self, x: pd.Series, k: int = 3, preprocess: bool = True
     ) -> List[Tuple[str, float]]:
-        """Same as self.topK but with confidence scores"""
+        """Get top K predictions with confidence scores.
+        
+        Args:
+            x: Input data series
+            k: Number of top predictions to return
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            List of (class, confidence) tuples, ordered by confidence
+        """
         conf_scores = self.getConfidenceScores(x, preprocess=preprocess)
-        # adapted from
-        # https://stackoverflow.com/questions/6910641/how-do-i-get-indices-of-n-maximum-values-in-a-numpy-array
         indices = np.argpartition(conf_scores, -k)[-k:]
         result = []
         for idx in indices:
@@ -108,16 +188,27 @@ class ArchPredBase(ABC):
         result = sorted(result, key=lambda x: x[1], reverse=True)
         return result
 
-    def printFeatures(self):
+    def printFeatures(self) -> None:
+        """Print the features used by the model."""
         for i, col in enumerate(self.orig_cols):
             print(f"Feature {i}:\t{col[:80]}")
 
     def evaluateTrain(self) -> float:
+        """Evaluate model performance on training data.
+        
+        Returns:
+            Training accuracy score
+        """
         acc = self.model.score(self.x_tr, self.y_train)
         print(f"{self.name} train acc: {acc}")
         return acc
 
     def evaluateTest(self) -> float:
+        """Evaluate model performance on test data.
+        
+        Returns:
+            Test accuracy score
+        """
         acc = self.model.score(self.x_test, self.y_test)
         print(f"{self.name} test acc: {acc}")
         return acc
@@ -125,7 +216,16 @@ class ArchPredBase(ABC):
     def evaluateAcc(
         self, data: pd.DataFrame, y_label: str = "model", preprocess: bool = True
     ) -> float:
-        # data columns must match training data columns
+        """Evaluate model performance on custom data.
+        
+        Args:
+            data: Input DataFrame
+            y_label: Column name for target variable
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Accuracy score
+        """
         y = self.label_encoder.transform(data[y_label])
         if not preprocess:
             x = data.drop(columns=["file", "model_family", "model"], axis=1)
@@ -137,7 +237,14 @@ class ArchPredBase(ABC):
 
 
 class RFEArchPred(ArchPredBase):
-    def printFeatures(self):
+    """Base class for models using Recursive Feature Elimination (RFE).
+    
+    This class extends ArchPredBase to add RFE-specific functionality for
+    feature selection and ranking.
+    """
+
+    def printFeatures(self) -> None:
+        """Print the features selected by RFE."""
         if not hasattr(self.rfe, "support_"):
             return
         print("Remaining Features:")
@@ -146,9 +253,19 @@ class RFEArchPred(ArchPredBase):
             if support[i]:
                 print(f"Feature {i}:\t{col_name[:80]}")
 
+
     def featureRank(
-        self, save_path: Path = None, suppress_output: bool = False
+        self, save_path: Optional[Path] = None, suppress_output: bool = False
     ) -> List[str]:
+        """Get ranking of features based on RFE.
+        
+        Args:
+            save_path: Optional path to save feature ranking
+            suppress_output: Whether to suppress console output
+            
+        Returns:
+            List of feature names ordered by their ranking
+        """
         if not hasattr(self.rfe, "support_"):
             return
         if not suppress_output:
@@ -186,13 +303,34 @@ class RFEArchPred(ArchPredBase):
 
 
 class SKLearnClassifier(ArchPredBase):
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+    """Base class for scikit-learn based classifiers."""
+
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores using scikit-learn's decision function.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         if preprocess:
             x = self.preprocessInput(x)
         preds = self.model.decision_function(x)[0]
         return softmax(preds)
 
-    def predict(self, x: pd.Series, preprocess=True) -> Tuple[str, float]:
+
+    def predict(self, x: pd.Series, preprocess: bool = True) -> Tuple[str, float]:
+        """Make a prediction using the scikit-learn model.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Tuple of (predicted class, confidence score)
+        """
         preds = self.getConfidenceScores(x, preprocess)
         pred = preds.argmax()
         conf = preds[pred]
@@ -201,21 +339,39 @@ class SKLearnClassifier(ArchPredBase):
 
 
 class NNArchPred(ArchPredBase):
+    """Neural network based architecture prediction model.
+    
+    This class implements a PyTorch-based neural network for architecture prediction.
+    """
+    
     NAME = "nn_old"
     FULL_NAME = "Neural Network (PyTorch)"
 
     def __init__(
         self,
-        df,
-        label=None,
-        verbose=True,
-        hidden_layer_factor=None,
-        num_layers=None,
-        name=None,
+        df: pd.DataFrame,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        hidden_layer_factor: Optional[float] = None,
+        num_layers: Optional[int] = None,
+        name: Optional[str] = None,
         epochs: int = 100,
-        train_size=None,
-        test_size=None,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ):
+        """Initialize neural network model.
+        
+        Args:
+            df: Input DataFrame
+            label: Target variable column name
+            verbose: Whether to print progress
+            hidden_layer_factor: Factor to determine hidden layer sizes
+            num_layers: Number of hidden layers
+            name: Model name
+            epochs: Number of training epochs
+            train_size: Size of training set
+            test_size: Size of test set
+        """
         if name is None:
             name = self.NAME
         super().__init__(
@@ -248,20 +404,46 @@ class NNArchPred(ArchPredBase):
         )
         self.model.eval()
 
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores from neural network.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         if preprocess:
             x = self.preprocessInput(x)
         preds = self.model.get_preds(x)
         return preds.cpu().numpy()
 
-    def predict(self, x: pd.Series, preprocess=True) -> Tuple[str, float]:
+
+    def predict(self, x: pd.Series, preprocess: bool = True) -> Tuple[str, float]:
+        """Make a prediction using the neural network.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Tuple of (predicted class, confidence score)
+        """
         preds = self.getConfidenceScores(x, preprocess)
         pred = preds.argmax()
         conf = preds[pred]
         label = self.label_encoder.inverse_transform(np.array([pred]))
         return label[0], conf.item()
 
+
     def evaluateTrain(self) -> float:
+        """Evaluate neural network on training data.
+        
+        Returns:
+            Training accuracy score
+        """
         train_preds = self.model.get_preds(self.x_tr, normalize=False)
         pred = train_preds.argmax(dim=1).cpu()
         train_pred_labels = self.label_encoder.inverse_transform(np.array(pred))
@@ -270,7 +452,13 @@ class NNArchPred(ArchPredBase):
         print(f"X_train acc1: {correct1 / len(self.y_train)}")
         return correct1 / len(self.y_train)
 
+
     def evaluateTest(self) -> float:
+        """Evaluate neural network on test data.
+        
+        Returns:
+            Test accuracy score
+        """
         test_preds = self.model.get_preds(self.x_test, normalize=False)
         pred = test_preds.argmax(dim=1).cpu()
         test_pred_labels = self.label_encoder.inverse_transform(np.array(pred))
@@ -281,22 +469,42 @@ class NNArchPred(ArchPredBase):
 
 
 class NN2LRArchPred(SKLearnClassifier):
+    """Neural network implemented using scikit-learn's MLPClassifier.
+    
+    This class provides a neural network implementation using scikit-learn's
+    MLPClassifier instead of PyTorch.
+    """
+    
     NAME = "nn"
     FULL_NAME = "Neural Network"
 
     def __init__(
         self,
-        df,
-        label=None,
-        verbose=True,
-        name=None,
+        df: pd.DataFrame,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        name: Optional[str] = None,
         rfe_num: int = 800,
         solver: str = "lbfgs",
         num_layers: int = 3,
         hidden_layer_factor: float = 1,
-        train_size=None,
-        test_size=None,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ):
+        """Initialize scikit-learn neural network model.
+        
+        Args:
+            df: Input DataFrame
+            label: Target variable column name
+            verbose: Whether to print progress
+            name: Model name
+            rfe_num: Number of features to select
+            solver: Optimization algorithm
+            num_layers: Number of hidden layers
+            hidden_layer_factor: Factor to determine hidden layer sizes
+            train_size: Size of training set
+            test_size: Size of test set
+        """
         if name is None:
             name = self.NAME
         super().__init__(
@@ -318,36 +526,59 @@ class NN2LRArchPred(SKLearnClassifier):
         self.estimator = MLPClassifier(
             hidden_layer_sizes=layer_sizes,
             solver=solver,
-            # early_stopping=True,
-            # validation_fraction=0.2,
         )
         self.model = make_pipeline(StandardScaler(), self.estimator)
         self.model.fit(self.x_tr, self.y_train)
         if self.verbose:
             self.evaluateTest()
 
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores from scikit-learn neural network.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         if preprocess:
             x = self.preprocessInput(x)
         return softmax(self.model.predict_proba(x)[0])
 
 
 class LRArchPred(RFEArchPred, SKLearnClassifier):
+    """Logistic Regression based architecture prediction model."""
+    
     NAME = "lr"
     FULL_NAME = "Logistic Regression"
 
     def __init__(
         self,
-        df,
-        label=None,
-        verbose=True,
-        rfe_num: int = None,
-        name=None,
+        df: pd.DataFrame,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        rfe_num: Optional[int] = None,
+        name: Optional[str] = None,
         multi_class: str = "auto",
         penalty: str = "l2",
-        train_size=None,
-        test_size=None,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ) -> None:
+        """Initialize logistic regression model.
+        
+        Args:
+            df: Input DataFrame
+            label: Target variable column name
+            verbose: Whether to print progress
+            rfe_num: Number of features to select
+            name: Model name
+            multi_class: Multi-class strategy
+            penalty: Regularization penalty
+            train_size: Size of training set
+            test_size: Size of test set
+        """
         if name is None:
             name = self.NAME
         super().__init__(
@@ -380,20 +611,34 @@ class LRArchPred(RFEArchPred, SKLearnClassifier):
 
 
 class RFArchPred(RFEArchPred, SKLearnClassifier):
+    """Random Forest based architecture prediction model."""
+    
     NAME = "rf"
     FULL_NAME = "Random Forest"
 
     def __init__(
         self,
-        df,
-        label=None,
-        verbose=True,
-        rfe_num: int = None,
-        name=None,
+        df: pd.DataFrame,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        rfe_num: Optional[int] = None,
+        name: Optional[str] = None,
         num_estimators: int = 100,
-        train_size=None,
-        test_size=None,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ) -> None:
+        """Initialize random forest model.
+        
+        Args:
+            df: Input DataFrame
+            label: Target variable column name
+            verbose: Whether to print progress
+            rfe_num: Number of features to select
+            name: Model name
+            num_estimators: Number of trees in forest
+            train_size: Size of training set
+            test_size: Size of test set
+        """
         if name is None:
             name = self.NAME
         super().__init__(
@@ -424,7 +669,17 @@ class RFArchPred(RFEArchPred, SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores from random forest.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         if preprocess:
             x = self.preprocessInput(x)
         preds = self.model.predict_proba(x)[0]
@@ -432,20 +687,34 @@ class RFArchPred(RFEArchPred, SKLearnClassifier):
 
 
 class KNNArchPred(SKLearnClassifier):
+    """K-Nearest Neighbors based architecture prediction model."""
+    
     NAME = "knn"
     FULL_NAME = "K Nearest Neighbors"
 
     def __init__(
         self,
-        df,
-        label=None,
-        verbose=True,
-        name=None,
+        df: pd.DataFrame,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        name: Optional[str] = None,
         k: int = 5,
         weights: str = "distance",
-        train_size=None,
-        test_size=None,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ) -> None:
+        """Initialize KNN model.
+        
+        Args:
+            df: Input DataFrame
+            label: Target variable column name
+            verbose: Whether to print progress
+            name: Model name
+            k: Number of neighbors
+            weights: Weight function for prediction
+            train_size: Size of training set
+            test_size: Size of test set
+        """
         if name is None:
             name = self.NAME
         super().__init__(
@@ -465,19 +734,47 @@ class KNNArchPred(SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores from KNN.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         if preprocess:
             x = self.preprocessInput(x)
         return softmax(self.model.predict_proba(x)[0])
 
 
 class CentroidArchPred(SKLearnClassifier):
+    """Nearest Centroid based architecture prediction model."""
+    
     NAME = "centroid"
     FULL_NAME = "Nearest Centroid"
 
     def __init__(
-        self, df, label=None, verbose=True, name=None, train_size=None, test_size=None
+        self,
+        df: pd.DataFrame,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        name: Optional[str] = None,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ) -> None:
+        """Initialize nearest centroid model.
+        
+        Args:
+            df: Input DataFrame
+            label: Target variable column name
+            verbose: Whether to print progress
+            name: Model name
+            train_size: Size of training set
+            test_size: Size of test set
+        """
         if name is None:
             name = self.NAME
         super().__init__(
@@ -495,7 +792,17 @@ class CentroidArchPred(SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores from nearest centroid.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         if preprocess:
             x = self.preprocessInput(x)
         pred_class = self.model.predict(x)[0]
@@ -505,18 +812,30 @@ class CentroidArchPred(SKLearnClassifier):
 
 
 class NBArchPred(SKLearnClassifier):
+    """Naive Bayes based architecture prediction model."""
+    
     NAME = "nb"
     FULL_NAME = "Naive Bayes"
 
     def __init__(
         self,
-        df,
-        label=None,
-        verbose=True,
-        name=None,
-        train_size=None,
-        test_size=None,
+        df: pd.DataFrame,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        name: Optional[str] = None,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ) -> None:
+        """Initialize naive bayes model.
+        
+        Args:
+            df: Input DataFrame
+            label: Target variable column name
+            verbose: Whether to print progress
+            name: Model name
+            train_size: Size of training set
+            test_size: Size of test set
+        """
         if name is None:
             name = self.NAME
         super().__init__(
@@ -534,27 +853,51 @@ class NBArchPred(SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores from naive bayes.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         if preprocess:
             x = self.preprocessInput(x)
         return softmax(self.model.predict_proba(x)[0])
 
 
 class ABArchPred(RFEArchPred, SKLearnClassifier):
+    """AdaBoost based architecture prediction model."""
+    
     NAME = "ab"
     FULL_NAME = "AdaBoost"
 
     def __init__(
         self,
-        df,
-        label=None,
-        verbose=True,
-        rfe_num: int = None,
-        name=None,
+        df: pd.DataFrame,
+        label: Optional[str] = None,
+        verbose: bool = True,
+        rfe_num: Optional[int] = None,
+        name: Optional[str] = None,
         num_estimators: int = 100,
-        train_size=None,
-        test_size=None,
+        train_size: Optional[float] = None,
+        test_size: Optional[float] = None,
     ) -> None:
+        """Initialize AdaBoost model.
+        
+        Args:
+            df: Input DataFrame
+            label: Target variable column name
+            verbose: Whether to print progress
+            rfe_num: Number of features to select
+            name: Model name
+            num_estimators: Number of estimators
+            train_size: Size of training set
+            test_size: Size of test set
+        """
         if name is None:
             name = self.NAME
         super().__init__(
@@ -585,7 +928,17 @@ class ABArchPred(RFEArchPred, SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-    def getConfidenceScores(self, x: pd.Series, preprocess=True) -> np.ndarray:
+
+    def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
+        """Get confidence scores from AdaBoost.
+        
+        Args:
+            x: Input data series
+            preprocess: Whether to preprocess the input
+            
+        Returns:
+            Array of confidence scores for each class
+        """
         if preprocess:
             x = self.preprocessInput(x)
         preds = self.model.predict_proba(x)[0]
@@ -593,8 +946,19 @@ class ABArchPred(RFEArchPred, SKLearnClassifier):
 
 
 def get_arch_pred_model(
-    model_type, df=None, label=None, kwargs: dict = {}
+    model_type: str, df: Optional[pd.DataFrame] = None, label: Optional[str] = None, kwargs: Dict[str, Any] = {}
 ) -> ArchPredBase:
+    """Get an architecture prediction model instance.
+    
+    Args:
+        model_type: Type of model to create
+        df: Input DataFrame
+        label: Target variable column name
+        kwargs: Additional keyword arguments for model initialization
+        
+    Returns:
+        Instance of requested model type
+    """
     if df is None:
         path = Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe"
         df = all_data(path)
@@ -611,9 +975,13 @@ def get_arch_pred_model(
     return arch_model[model_type](df=df, label=label, **kwargs)
 
 
-def arch_model_names():
+def arch_model_names() -> List[str]:
+    """Get list of available model names.
+    
+    Returns:
+        List of model name strings
+    """
     return [
-        # NNArchPred.NAME,
         LRArchPred.NAME,
         NN2LRArchPred.NAME,
         KNNArchPred.NAME,
@@ -624,9 +992,13 @@ def arch_model_names():
     ]
 
 
-def arch_model_full_name():
+def arch_model_full_name() -> Dict[str, str]:
+    """Get mapping of model names to their full names.
+    
+    Returns:
+        Dictionary mapping model names to their full names
+    """
     return {
-        # NNArchPred.NAME: NNArchPred.FULL_NAME,
         LRArchPred.NAME: LRArchPred.FULL_NAME,
         NN2LRArchPred.NAME: NN2LRArchPred.FULL_NAME,
         KNNArchPred.NAME: KNNArchPred.FULL_NAME,

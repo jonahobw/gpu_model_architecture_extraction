@@ -1,8 +1,54 @@
 """
-Generic model training from Pytorch model zoo, used for the victim model.
+Model management and training framework for deep neural networks.
 
-Assuming that the victim model architecture has already been found/predicted,
-the surrogate model can be trained using labels from the victim model.
+This module provides a comprehensive framework for managing, training, and manipulating
+deep neural network models. It includes support for:
+- Victim models (original models to be attacked, which may be pruned or quantized)
+- Surrogate models (models trained to mimic victim models)
+
+The framework supports various operations including:
+- Model training and evaluation
+- Model pruning and quantization
+- Profiling with nvprof
+- Model evasion attacks
+- Model architecture prediction
+
+Example Usage:
+    ```python
+    # Create and train a victim model
+    victim = VictimModelManager(
+        architecture="resnet50",
+        dataset="cifar10",
+        model_name="victim1",
+        pretrained=True
+    )
+    victim.trainModel(num_epochs=100)
+
+    # Create a surrogate model based on the victim
+    surrogate = SurrogateModelManager(
+        victim_model_path=victim.model_path,
+        architecture="resnet18",
+        arch_conf=0.95,
+        arch_pred_model_name="nn"
+    )
+    surrogate.trainModel(num_epochs=50)
+
+    # Create a pruned version of the victim model
+    pruned = PruneModelManager(
+        victim_model_path=victim.model_path,
+        ratio=0.5,
+        finetune_epochs=20
+    )
+    ```
+
+Dependencies:
+    - torch: PyTorch deep learning framework
+    - numpy: Numerical computing
+    - pandas: Data manipulation
+    - cleverhans: Adversarial attack library
+    - tqdm: Progress bars
+    - pathlib: Path manipulation
+    - typing: Type hints
 """
 
 import datetime
@@ -13,13 +59,22 @@ import sys
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    TypeVar,
+    Generic,
+)
 
 import numpy as np
 import pandas as pd
 import torch
-from cleverhans.torch.attacks.projected_gradient_descent import \
-    projected_gradient_descent
+from cleverhans.torch.attacks.projected_gradient_descent import projected_gradient_descent
 from torch.nn.utils import prune
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -28,15 +83,34 @@ from architecture_prediction import ArchPredBase
 from collect_profiles import generateExeName, run_command
 from datasets import Dataset
 from format_profiles import avgProfiles, parse_one_profile
-from get_model import (get_model, get_quantized_model, getModelParams,
-                       quantized_models)
+from get_model import (
+    get_model,
+    get_quantized_model,
+    getModelParams,
+    quantized_models,
+)
 from logger import CSVLogger
 from model_metrics import accuracy, both_correct, correct
 from online import OnlineStats
 from utils import checkDict, latest_file, latestFileFromList
 
 
-def loadModel(path: Path, model: torch.nn.Module, device: torch.device = None) -> None:
+def loadModel(
+    path: Path,
+    model: torch.nn.Module,
+    device: Optional[torch.device] = None
+) -> None:
+    """
+    Load model parameters from a saved checkpoint.
+
+    Args:
+        path: Path to the model checkpoint file
+        model: Model to load parameters into
+        device: Device to load the model onto (default: None)
+
+    Raises:
+        AssertionError: If the model path does not exist
+    """
     assert path.exists(), f"Model load path \n{path}\n does not exist."
     if device is not None:
         params = torch.load(path, map_location=device)
@@ -48,14 +122,24 @@ def loadModel(path: Path, model: torch.nn.Module, device: torch.device = None) -
 
 class ModelManagerBase(ABC):
     """
-    Generic model manager class.
-    Can train a model on a dataset and save/load a model.
+    Base class for managing deep neural network models.
 
-    Note- inheriting classes should not modify self.config until
-    after calling this constructor because this constructor will overwrite
-    self.config
+    This abstract base class provides core functionality for model management,
+    including training, saving, loading, and configuration management. It serves
+    as the foundation for specialized model managers like VictimModelManager,
+    SurrogateModelManager, etc.
 
-    This constructor leaves no footprint on the filesystem.
+    Attributes:
+        MODEL_FILENAME (str): Default filename for saved model checkpoints
+        architecture (str): Model architecture name
+        model_name (str): Name of the model instance
+        path (Path): Path to model directory
+        dataset (Dataset): Dataset for training/evaluation
+        model (torch.nn.Module): The actual model instance
+        device (torch.device): Device to run model on
+        config (dict): Model configuration dictionary
+        epochs_trained (int): Number of epochs trained
+        train_metrics (List[str]): List of metrics to track during training
     """
 
     MODEL_FILENAME = "checkpoint.pt"
@@ -66,13 +150,28 @@ class ModelManagerBase(ABC):
         model_name: str,
         path: Path,
         dataset: str,
-        data_subset_percent: float = None,
+        data_subset_percent: Optional[float] = None,
         data_idx: int = 0,
         gpu: int = -1,
         save_model: bool = True,
     ) -> None:
         """
-        path: path to folder
+        Initialize the model manager.
+
+        Args:
+            architecture: Model architecture name
+            model_name: Name for this model instance
+            path: Path to store model files
+            dataset: Name of dataset to use
+            data_subset_percent: Percentage of dataset to use (optional)
+            data_idx: Index for dataset subset
+            gpu: GPU device number (-1 for CPU)
+            save_model: Whether to save model checkpoints
+
+        Note:
+            Inheriting classes should not modify self.config until after
+            calling this constructor as it will overwrite self.config.
+            This constructor leaves no footprint on the filesystem.
         """
         self.architecture = architecture
         self.model_name = model_name
@@ -99,11 +198,7 @@ class ModelManagerBase(ABC):
             "device": str(self.device),
         }
 
-        self.epochs_trained = 0  # if loading a model, this gets updated in inheriting classes' constructors
-        # when victim models are loaded, they call self.loadModel, which calls
-        # self.saveConfig().  If config["epochs_trained"] = 0 when this happens,
-        # then the actual epochs_trained is overwritten.  To prevent this, we
-        # have the check below.
+        self.epochs_trained = 0
         if not self.path.exists():
             self.config["epochs_trained"] = self.epochs_trained
 
@@ -121,8 +216,22 @@ class ModelManagerBase(ABC):
         ]
 
     def constructModel(
-        self, pretrained: bool = False, quantized: bool = False, kwargs=None
+        self,
+        pretrained: bool = False,
+        quantized: bool = False,
+        kwargs: Optional[Dict[str, Any]] = None
     ) -> torch.nn.Module:
+        """
+        Construct a new model instance.
+
+        Args:
+            pretrained: Whether to use pretrained weights
+            quantized: Whether to use quantized model
+            kwargs: Additional arguments for model construction
+
+        Returns:
+            torch.nn.Module: Constructed model instance
+        """
         if kwargs is None:
             kwargs = {}
         kwargs.update({"num_classes": self.dataset.num_classes})
@@ -135,10 +244,16 @@ class ModelManagerBase(ABC):
         return model
 
     def loadModel(self, path: Path) -> None:
+        """
+        Load model parameters from a checkpoint.
+
+        Args:
+            path: Path to model checkpoint
+
+        Raises:
+            AssertionError: If the model path does not exist
+        """
         assert Path(path).exists(), f"Model load path \n{path}\n does not exist."
-        # the epochs trained should already be done from loading the config.
-        # if "_" in str(path.name):
-        #     self.epochs_trained = int(str(path.name).split("_")[1].split(".")[0])
         params = torch.load(path, map_location=self.device)
         self.model.load_state_dict(params, strict=False)
         self.model.eval()
@@ -147,18 +262,24 @@ class ModelManagerBase(ABC):
         self.saveConfig({"model_path": str(path)})
 
     def saveModel(
-        self, name: str = None, epoch: int = None, replace: bool = False
+        self,
+        name: Optional[str] = None,
+        epoch: Optional[int] = None,
+        replace: bool = False
     ) -> None:
         """
-        If epoch is passed, will append '_<epoch>' before the file extension
-        in <name>.  Example: if name="checkpoint.pt" and epoch = 10, then
-        will save as "checkpoint_10.pt".
-        If replace is true, then if the model file already exists it will be replaced.
-        If replace is false and the model file already exists, an error is raised.
+        Save model parameters to a checkpoint file.
+
+        Args:
+            name: Name for the checkpoint file (default: MODEL_FILENAME)
+            epoch: Epoch number to append to filename
+            replace: Whether to replace existing file
+
+        Raises:
+            FileExistsError: If file exists and replace is False
         """
         if not self.save_model:
             return
-        # todo add remove option
         if name is None:
             name = self.MODEL_FILENAME
         if epoch is not None:
@@ -175,6 +296,15 @@ class ModelManagerBase(ABC):
         self.saveConfig({"model_path": str(model_file)})
 
     def loadDataset(self, name: str) -> Dataset:
+        """
+        Load a dataset for training/evaluation.
+
+        Args:
+            name: Name of dataset to load
+
+        Returns:
+            Dataset: Loaded dataset instance
+        """
         return Dataset(
             name,
             data_subset_percent=self.data_subset_percent,
@@ -184,18 +314,29 @@ class ModelManagerBase(ABC):
 
     @staticmethod
     @abstractmethod
-    def load(self, path: Path, gpu: int = -1):
-        """Abstract method"""
-
-    def saveConfig(self, args: dict = {}) -> None:
+    def load(path: Path, gpu: int = -1) -> 'ModelManagerBase':
         """
-        Write parameters to a json file.  If file exists already, then will be
-        appended to/overwritten.  If args are provided, they are added to the config file.
+        Load a model manager from a saved checkpoint.
+
+        Args:
+            path: Path to model checkpoint
+            gpu: GPU device number (-1 for CPU)
+
+        Returns:
+            ModelManagerBase: Loaded model manager instance
+        """
+        pass
+
+    def saveConfig(self, args: Dict[str, Any] = {}) -> None:
+        """
+        Save configuration parameters to a JSON file.
+
+        Args:
+            args: Additional arguments to add to config
         """
         if not self.save_model:
             return
         self.config.update(args)
-        # look for config file
         config_files = list(self.path.glob("params_*"))
         if len(config_files) > 1:
             raise ValueError(f"Too many config files in path {self.path}")
@@ -211,9 +352,9 @@ class ModelManagerBase(ABC):
         with open(path, "w+") as f:
             json.dump(self.config, f, indent=4)
 
-    def delete(self):
+    def delete(self) -> None:
         """
-        Deletes the folder for this model.
+        Delete the model directory and all its contents.
         """
         path = Path(self.path)
         if path.exists() and path.is_dir():
@@ -221,12 +362,18 @@ class ModelManagerBase(ABC):
             print(f"Deleted {str(path.relative_to(Path.cwd()))}")
 
     @staticmethod
-    def loadConfig(path: Path) -> dict:
+    def loadConfig(path: Path) -> Dict[str, Any]:
         """
-        Given a path to a model manager folder, return its config file as a dict.
-        path is not hardcoded as self.path so that this method can be called
-        by inheriting classes before self.path is set (which occurs when invoking
-        this class's constructor).
+        Load configuration from a model manager directory.
+
+        Args:
+            path: Path to model manager directory
+
+        Returns:
+            Dict[str, Any]: Configuration dictionary
+
+        Raises:
+            ValueError: If no config file found or multiple config files exist
         """
         config_files = list(path.glob("params_*"))
         if len(config_files) != 1:
@@ -242,17 +389,37 @@ class ModelManagerBase(ABC):
 
     @staticmethod
     def loadTrainLog(path: Path) -> pd.DataFrame:
+        """
+        Load training log from CSV file.
+
+        Args:
+            path: Path to model directory
+
+        Returns:
+            pd.DataFrame: Training log data
+
+        Raises:
+            AssertionError: If log file does not exist
+        """
         train_logfile = path / "logs.csv"
         assert train_logfile.exists()
         return pd.read_csv(train_logfile)
 
     @staticmethod
-    def saveConfigFast(path: Path, args: dict, replace: bool = False):
+    def saveConfigFast(path: Path, args: Dict[str, Any], replace: bool = False) -> None:
         """
-        Given a path to a model manager folder and config arguments,
-        save the arguments in the config folder, rewriting existing arguments if
-        replace is true.  Provided as a static method to allow config
+        Quickly save configuration arguments to existing config file.
+
+        Provided as a static method to allow config
         alteration without loading modelmanager object.
+
+        Args:
+            path: Path to model directory
+            args: Arguments to save
+            replace: Whether to replace existing values
+
+        Raises:
+            ValueError: If no config file found or multiple config files exist
         """
         config_files = list(path.glob("params_*"))
         if len(config_files) != 1:
@@ -272,35 +439,34 @@ class ModelManagerBase(ABC):
     def trainModel(
         self,
         num_epochs: int,
-        lr: float = None,
-        debug: int = None,
+        lr: Optional[float] = None,
+        debug: Optional[int] = None,
         patience: int = 10,
         replace: bool = False,
         run_attack: bool = False,
-    ):
-        """Trains the model using dataset self.dataset.
+    ) -> None:
+        """
+        Train the model on the dataset self.dataset.
 
         Args:
-            num_epochs (int): number of training epochs
-            lr (float): initial learning rate.  This function decreases the learning rate
-                by a factor of 0.1 when the loss fails to decrease by 1e-4 for 10 iterations.
-                If not passed, will default to learning rate of model from get_model.py, and
-                if there is no learning rate specified there, defaults to 0.1.
-            save_freq: how often to save model, default is only at the end. models are overwritten.
+            num_epochs: Number of training epochs
+            lr: Initial learning rate (default: from model params or 0.1)
+            debug: Number of iterations to run in debug mode
+            patience: Patience for learning rate reduction
+            replace: Whether to replace existing model files
+            run_attack: Whether to run attack during training
 
-        Returns:
-            Nothing, only sets the self.model class variable.
+        Note:
+            Learning rate is reduced by factor of 0.1 when loss fails to
+            decrease by 1e-4 for patience iterations.
         """
-        # todo add checkpoint freq, also make note to flush logger when checkpointing
         assert self.dataset is not None
         assert self.model is not None, "Must call constructModel() first"
 
         if num_epochs == 0:
             self.model.eval()
             print("Training ended, saving model.")
-            self.saveModel(
-                replace=replace
-            )  # this function already checks self.save_model
+            self.saveModel(replace=replace)
             self.config["epochs_trained"] = self.epochs_trained
             if "initialLR" not in self.config:
                 self.config["initialLR"] = lr
@@ -345,8 +511,6 @@ class ModelManagerBase(ABC):
 
                 self.epochs_trained += 1
                 if self.save_model:
-                    # we only write to the log file once the model is saved,
-                    # see below after self.saveModel()
                     logger.futureWrite(
                         {
                             "timestamp": time.time() - since,
@@ -360,9 +524,9 @@ class ModelManagerBase(ABC):
 
         self.model.eval()
         print("Training ended, saving model.")
-        self.saveModel(replace=replace)  # this function already checks self.save_model
+        self.saveModel(replace=replace)
         if self.save_model:
-            logger.flush()  # this saves all the futureWrite() calls
+            logger.flush()
             logger.close()
         self.config["epochs_trained"] = self.epochs_trained
         if "initialLR" not in self.config:
@@ -377,10 +541,23 @@ class ModelManagerBase(ABC):
         optimizer: torch.optim.Optimizer,
         loss_fn: Callable,
         lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
-        debug: int = None,
+        debug: Optional[int] = None,
         run_attack: bool = False,
-    ):
-        # todo implement run_attack like it is implemented for surrogate models
+    ) -> Dict[str, float]:
+        """
+        Collect metrics for a training epoch.
+
+        Args:
+            epoch_num: Current epoch number
+            optimizer: Model optimizer
+            loss_fn: Loss function
+            lr_scheduler: Learning rate scheduler
+            debug: Number of iterations to run in debug mode
+            run_attack: Whether to run attack during training
+
+        Returns:
+            Dict[str, float]: Dictionary of metrics
+        """
         loss, acc1, acc5 = self.runEpoch(
             train=True,
             epoch=epoch_num,
@@ -416,10 +593,22 @@ class ModelManagerBase(ABC):
         optim: torch.optim.Optimizer,
         loss_fn: Callable,
         lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
-        debug: int = None,
-    ) -> tuple[int]:
-        """Run a single epoch."""
+        debug: Optional[int] = None,
+    ) -> Tuple[float, float, float]:
+        """
+        Run a single training or validation epoch.
 
+        Args:
+            train: Whether this is a training epoch
+            epoch: Current epoch number
+            optim: Model optimizer
+            loss_fn: Loss function
+            lr_scheduler: Learning rate scheduler
+            debug: Number of iterations to run in debug mode
+
+        Returns:
+            Tuple[float, float, float]: (loss, top1 accuracy, top5 accuracy)
+        """
         self.model.eval()
         prefix = "val"
         dl = self.dataset.val_dl
@@ -486,13 +675,37 @@ class ModelManagerBase(ABC):
         eps: float,
         step_size: float,
         iterations: int,
-        norm=np.inf,
+        norm: float = np.inf,
     ) -> torch.Tensor:
+        """
+        Run Projected Gradient Descent attack.
+
+        Args:
+            x: Input tensor
+            eps: Maximum perturbation
+            step_size: Step size for gradient updates
+            iterations: Number of iterations
+            norm: Norm for projection (default: inf)
+
+        Returns:
+            torch.Tensor: Adversarial examples
+        """
         return projected_gradient_descent(
             self.model, x, eps=eps, eps_iter=step_size, nb_iter=iterations, norm=norm
         )
 
-    def topKAcc(self, dataloader: torch.utils.data.DataLoader, topk=(1, 5)):
+    def topKAcc(
+        self,
+        dataloader: torch.utils.data.DataLoader,
+        topk: Tuple[int, ...] = (1, 5)
+    ) -> None:
+        """
+        Calculate top-k accuracy on a dataset.
+
+        Args:
+            dataloader: DataLoader for evaluation
+            topk: Tuple of k values for top-k accuracy
+        """
         self.model.eval()
         online_stats = {}
         for k in topk:
@@ -515,14 +728,21 @@ class ModelManagerBase(ABC):
 
         print({k: online_stats[k].mean for k in online_stats})
 
-    def getL1WeightNorm(self, other) -> float:
+    def getL1WeightNorm(self, other: 'ModelManagerBase') -> float:
         """
-        Return the sum of elementwise differences between parameters of
-        2 models of the same architecture.
+        Calculate L1 norm of weight differences between two models.
+
+        Args:
+            other: Another model manager to compare with
+
+        Returns:
+            float: L1 norm of weight differences
+
+        Raises:
+            ValueError: If models have different architectures
         """
         if not isinstance(other.model, type(self.model)):
             raise ValueError
-            # return float("inf")
 
         l1_norm = 0.0
         for x, y in zip(
@@ -533,20 +753,45 @@ class ModelManagerBase(ABC):
         return l1_norm
 
     def __repr__(self) -> str:
+        """Return string representation of model manager."""
         return str(self.path.relative_to(Path.cwd()))
 
 
 class ProfiledModelManager(ModelManagerBase):
-    """Extends ModelManagerBase to include support for profiling"""
+    """
+    Extends ModelManagerBase to include support for profiling neural network models.
+
+    This class adds functionality for profiling model performance using NVIDIA's profiling tools,
+    managing profile data, and using profiles for architecture prediction.
+
+    Attributes:
+        gpu (int): GPU device number (-1 for CPU)
+        model_path (Optional[Path]): Path to the model checkpoint file
+    """
 
     def runNVProf(
-        self, use_exe: bool = True, seed: int = 47, n: int = 10, input: str = "0"
-    ):
+        self, 
+        use_exe: bool = True, 
+        seed: int = 47, 
+        n: int = 10, 
+        input: str = "0"
+    ) -> None:
         """
+        Run NVIDIA profiler on the model and save the results.
+
         Creates a subfolder self.path/profiles, and adds a profile file profile_{pid}.csv and
-        associated params_{pid}.json file to this subfolder, if the profile succeeded.
+        associated params_{pid}.json file to this subfolder if the profile succeeds.
         There is support for multiple profiles.
-        Note - this function does not check for collisions in pid.
+
+        Args:
+            use_exe (bool): Whether to use executable for profiling
+            seed (int): Random seed for profiling
+            n (int): Number of iterations to profile
+            input (str): Input data specification
+
+        Raises:
+            AssertionError: If GPU is not available or model path is not set
+            RuntimeError: If profiling fails after 5 retries
         """
         assert self.gpu >= 0
         assert self.model_path is not None
@@ -598,9 +843,11 @@ class ProfiledModelManager(ModelManagerBase):
 
     def isProfiled(self) -> bool:
         """
-        Checks if the model has been profiled. Returns True if there
-        is a subfolder self.path/profiles with at least one profile_{pid}.csv
-        and associated params_{pid}.csv.
+        Check if the model has been profiled.
+
+        Returns:
+            bool: True if there is a subfolder self.path/profiles with at least one 
+                  profile_{pid}.csv and associated params_{pid}.json file.
         """
         profile_folder = self.path / "profiles"
         profile_config = list(profile_folder.glob("params_*"))
@@ -614,14 +861,24 @@ class ProfiledModelManager(ModelManagerBase):
         profile_path = self.path / "profiles" / Path(conf["file"]).name
         return profile_path.exists()
 
-    def getProfile(self, filters: dict = None) -> Tuple[Path, Dict]:
+    def getProfile(self, filters: Optional[Dict[str, Any]] = None) -> Tuple[Path, Dict[str, Any]]:
         """
-        Return a tuple of (path to profile_{pid}.csv,
-        dictionary obtained from reading params_{pid}.json).
-        filters: a dict and each argument in the dict must match
-            the argument from the config file associated with a profile.
-            to get a profile by name, can specify {"profile_number": "2181935"}
-        If there are multiple profiles which fit the filters, return the latest one.
+        Get a specific profile based on filter criteria.
+
+        Args:
+            filters (Optional[Dict[str, Any]]): Dictionary of filter criteria. Each argument
+                must match the argument from the config file associated with a profile.
+                To get a profile by name, specify {"profile_number": "2181935"}.  If there 
+                are multiple profiles which fit the filters, return the latest one.
+
+        Returns:
+            Tuple[Path, Dict[str, Any]]: Tuple containing:
+                - Path to profile_{pid}.csv
+                - Dictionary from params_{pid}.json
+
+        Raises:
+            ValueError: If no profiles match the filters
+            AssertionError: If no profile configs exist
         """
         if filters is None:
             filters = {}
@@ -654,14 +911,19 @@ class ProfiledModelManager(ModelManagerBase):
         conf = fit_filters[latest_valid_path]
         return latest_valid_path, conf
 
-    def getAllProfiles(self, filters: dict = None) -> List[Tuple[Path, Dict]]:
+    def getAllProfiles(self, filters: Optional[Dict[str, Any]] = None) -> List[Tuple[Path, Dict[str, Any]]]:
         """
-        Returns a list of tuples (path to profile_{pid}.csv,
-        dictionary obtained from reading params_{pid}.json) for
-        every profile in self.path/profiles
-        filters: a dict and each argument in the dict must match
-            the argument from the config file associated with a profile.
-            to get a profile by name, can specify {"profile_number": "2181935"}
+        Get all profiles matching filter criteria.
+
+        Args:
+            filters (Optional[Dict[str, Any]]): Dictionary of filter criteria. Each argument
+                must match the argument from the config file associated with a profile.
+                To get profiles by name, specify {"profile_number": "2181935"}.
+
+        Returns:
+            List[Tuple[Path, Dict[str, Any]]]: List of tuples containing:
+                - Path to profile_{pid}.csv
+                - Dictionary from params_{pid}.json
         """
         if filters is None:
             filters = {}
@@ -684,16 +946,27 @@ class ProfiledModelManager(ModelManagerBase):
         return result
 
     def predictVictimArch(
-        self, arch_pred_model: ArchPredBase, average: bool = False, filters: dict = None
-    ) -> Tuple[str, float]:
+        self, 
+        arch_pred_model: ArchPredBase, 
+        average: bool = False, 
+        filters: Optional[Dict[str, Any]] = None
+    ) -> Tuple[str, float, ArchPredBase]:
         """
-        Given an architecture prediction model, use it to predict the architecture
-        of the model associated with this model manager.
-        average: if true, will average the features from all of the profiles on this
-        model and then pass the features to the architecture prediction model.
-        filters: a dict and each argument in the dict must match
-            the argument from the config file associated with a profile.
-            to get a profile by name, can specify {"profile_number": "2181935"}
+        Predict the architecture of the victim model using a trained architecture prediction model.
+
+        Args:
+            arch_pred_model (ArchPredBase): Trained architecture prediction model
+            average (bool): If True, average features from all profiles before prediction
+            filters (Optional[Dict[str, Any]]): Filter criteria for selecting profiles
+
+        Returns:
+            Tuple[str, float, ArchPredBase]: Tuple containing:
+                - Predicted architecture name
+                - Confidence score
+                - Architecture prediction model used
+
+        Raises:
+            AssertionError: If model has not been profiled
         """
         assert self.isProfiled()
 
@@ -748,38 +1021,51 @@ class ProfiledModelManager(ModelManagerBase):
 
 
 class VictimModelManager(ProfiledModelManager):
+    """
+    Manages victim models for model extraction attacks.
+
+    This class handles the creation, training, and management of victim models that will be
+    targeted by model extraction attacks. It extends ProfiledModelManager to include
+    functionality specific to victim models.
+
+    Attributes:
+        pretrained (bool): Whether the model uses pretrained weights
+        trained (bool): Whether the model has been trained
+    """
+
     def __init__(
         self,
         architecture: str,
         dataset: str,
         model_name: str,
-        load: str = None,
+        load: Optional[str] = None,
         gpu: int = -1,
         data_subset_percent: float = 0.5,
         pretrained: bool = False,
         save_model: bool = True,
-    ):
+    ) -> None:
         """
-        Models files are stored in a folder
-        ./models/{model_architecture}/{self.name}_{date_time}/
+        Initialize a victim model manager.
 
-        This includes the model file, a csv documenting training, and a
-        config file.
+        Model files are stored in a folder ./models/{model_architecture}/{self.name}_{date_time}/
+        This includes the model file, a csv documenting training, and a config file.
 
         Args:
-            architecture (str): the exact string representation of
-                the model architecture. See get_model.py.
-            dataset (str): the name of the dataset all lowercase.
-            model_name (str): The name of the model, can be anything except
-                don't use underscores.
-            load (str, optional): If provided, should be the absolute path to
-                the model folder, {cwd}/models/{model_architecture}/{self.name}{date_time}.
-                This will load the model stored there.
-            data_subset_percent (float, optional): If provided, should be the
-                fraction of the dataset to use.  This will be generated determinisitcally.
-                Uses torch.utils.data.random_split (see datasets.py)
-            idx (int): the index into the subset of the dataset.  0
-                for victim model and 1 for surrogate.
+            architecture (str): The exact string representation of the model architecture.
+                See get_model.py for valid architectures.
+            dataset (str): The name of the dataset (all lowercase).
+            model_name (str): The name of the model. Do not use underscores.
+            load (Optional[str]): If provided, should be the absolute path to the model folder,
+                {cwd}/models/{model_architecture}/{self.name}{date_time}. This will load the
+                model stored there.
+            gpu (int): GPU device number (-1 for CPU).
+            data_subset_percent (float): The fraction of the dataset to use. This will be
+                generated deterministically using torch.utils.data.random_split.
+            pretrained (bool): Whether to use pretrained weights.
+            save_model (bool): Whether to save model checkpoints.
+
+        Note:
+            The data_idx parameter is set to 0 for victim models.
         """
         path = self.generateFolder(load, architecture, model_name)
         super().__init__(
@@ -816,8 +1102,17 @@ class VictimModelManager(ProfiledModelManager):
         self.saveConfig()
 
     @staticmethod
-    def load(model_path: Path, gpu: int = -1):
-        """Create a ModelManager Object from a path to a model file."""
+    def load(model_path: Path, gpu: int = -1) -> 'VictimModelManager':
+        """
+        Create a VictimModelManager from a saved model checkpoint.
+
+        Args:
+            model_path (Path): Path to the model checkpoint file
+            gpu (int): GPU device number (-1 for CPU)
+
+        Returns:
+            VictimModelManager: Loaded victim model manager instance
+        """
         folder_path = Path(model_path).parent
         conf = ModelManagerBase.loadConfig(folder_path)
         print(
@@ -835,9 +1130,17 @@ class VictimModelManager(ProfiledModelManager):
         model_manager.config = conf
         return model_manager
 
-    def generateFolder(self, load: Path, architecture: str, model_name: str) -> str:
+    def generateFolder(self, load: Optional[Path], architecture: str, model_name: str) -> Path:
         """
-        Generates the model folder as ./models/model_architecture/{self.name}_{date_time}/
+        Generate the model folder path.
+
+        Args:
+            load (Optional[Path]): Path to existing model folder if loading
+            architecture (str): Model architecture name
+            model_name (str): Model instance name
+
+        Returns:
+            Path: Path to the model folder
         """
         if load:
             return Path(load).parent
@@ -847,14 +1150,22 @@ class VictimModelManager(ProfiledModelManager):
 
     @staticmethod
     def getModelPaths(
-        prefix: str = None, architectures: List[str] = None
+        prefix: Optional[str] = None,
+        architectures: Optional[List[str]] = None
     ) -> List[Path]:
         """
-        Return a list of paths to all victim models
-        in directory "./<prefix>".  This directory must be organized
-        by model architecture folders whose subfolders are victim model
-        folders and contain a model stored in 'checkpoint.pt'.
-        Default prefix is ./models/
+        Get paths to all victim models in a directory.
+
+        Args:
+            prefix (Optional[str]): Directory prefix to search in. Defaults to "models".
+            architectures (Optional[List[str]]): List of architectures to filter by.
+
+        Returns:
+            List[Path]: List of paths to victim model checkpoints
+
+        Note:
+            The directory must be organized by model architecture folders whose subfolders
+            are victim model folders and contain a model stored in 'checkpoint.pt'.
         """
         if prefix is None:
             prefix = "models"
@@ -879,7 +1190,12 @@ class VictimModelManager(ProfiledModelManager):
         return model_paths
 
     def getSurrogateModelPaths(self) -> List[Path]:
-        """Returns a list of paths to surrogate models of this victim model."""
+        """
+        Get paths to surrogate models trained on this victim model.
+
+        Returns:
+            List[Path]: List of paths to surrogate model checkpoints
+        """
         res = []
         surrogate_paths = list(self.path.glob("surrogate*"))
         for path in surrogate_paths:
@@ -927,14 +1243,20 @@ class VictimModelManager(ProfiledModelManager):
         parameters passed to this algorithm as well as the indices of the dataset
         which are included in the transfer set.
 
-        dataset_name: name of the dataset from which to generate the transfer set (should
+        Args:
+            dataset_name (str): Name of dataset to generate transfer set from (should
             not be the dataset on which the victim model was trained)
-        transfer_size: the size of the transfer set
-        sample_avg: this is the number of samples to take per class before averaging,
+            transfer_size (int): Size of transfer set to generate
+            sample_avg (int): Number of samples per class for entropy estimation, 
             higher number means better entropy estimation.  Only used if random_policy=0
-        random_policy: if true, generates the transfer set randomly. If false, uses the
-            adaptive method.
-        entropy: if true, uses entropy as a class influence measure, else uses confidence
+            random_policy (bool): If True, use random sampling strategy
+            entropy (bool): If True, use entropy for adaptive sampling, else use confidence
+        
+        Raises:
+            AssertionError: If dataset is same as victim training dataset
+            AssertionError: If transfer size exceeds dataset size
+            AssertionError: If sample_avg * num_classes exceeds dataset size
+            AssertionError: If sample_avg * num_classes exceeds transfer size
         """
         config = {
             "dataset_name": dataset_name,
@@ -1151,6 +1473,21 @@ class VictimModelManager(ProfiledModelManager):
         so when training a surrogate model, the victim model needs to be queried to get the labels.
 
         Return value is a tuple of (path to transfer set json file, Dataset object).
+
+        Args:
+            dataset_name (str): Name of dataset used for transfer set
+            transfer_size (int): Size of transfer set
+            sample_avg (int): Number of samples per class used
+            random_policy (bool): Whether random sampling was used
+            entropy (bool): Whether entropy was used for sampling
+            force (bool): If True, generate new transfer set if none exists
+        
+        Returns:
+            Tuple[Path, Dataset]: Tuple containing:
+                - Path to transfer set JSON file
+                - Dataset object for transfer set
+        Raises:
+            FileNotFoundError: If no matching transfer set found and force=False
         """
         config = {
             "dataset_name": dataset_name,
@@ -1207,6 +1544,19 @@ class VictimModelManager(ProfiledModelManager):
 
 
 class QuantizedModelManager(ProfiledModelManager):
+    """
+    Manages quantized versions of victim models.
+
+    This class handles the creation and management of quantized versions of victim models,
+    supporting both FBGEMM and QNNPACK backends for quantization.
+
+    Attributes:
+        FOLDER_NAME (str): Name of the folder for quantized models
+        MODEL_FILENAME (str): Name of the quantized model checkpoint file
+        backend (str): Quantization backend to use ('fbgemm' or 'qnnpack')
+        victim_manager (VictimModelManager): The original victim model manager
+    """
+
     FOLDER_NAME = "quantize"
     MODEL_FILENAME = "quantized.pt"
 
@@ -1214,10 +1564,24 @@ class QuantizedModelManager(ProfiledModelManager):
         self,
         victim_model_path: Path,
         backend: str = "fbgemm",
-        load_path: Path = None,
+        load_path: Optional[Path] = None,
         gpu: int = -1,
         save_model: bool = True,
     ) -> None:
+        """
+        Initialize a quantized model manager.
+
+        Args:
+            victim_model_path (Path): Path to the victim model checkpoint
+            backend (str): Quantization backend to use ('fbgemm' or 'qnnpack')
+            load_path (Optional[Path]): Path to existing quantized model if loading
+            gpu (int): GPU device number (-1 for CPU)
+            save_model (bool): Whether to save model checkpoints
+
+        Raises:
+            AssertionError: If victim model is not trained
+            AssertionError: If victim model architecture is not supported for quantization
+        """
         self.victim_manager = VictimModelManager.load(victim_model_path)
         assert self.victim_manager.config["epochs_trained"] > 0
         assert self.victim_manager.architecture in quantized_models
@@ -1253,6 +1617,14 @@ class QuantizedModelManager(ProfiledModelManager):
         )
 
     def prepare_for_quantization(self) -> None:
+        """
+        Prepare the model for quantization.
+
+        Sets up the quantization configuration and fuses model layers.
+        The configuration depends on the selected backend:
+        - FBGEMM: Uses per-channel weight quantization
+        - QNNPACK: Uses default weight quantization
+        """
         torch.backends.quantized.engine = self.backend
         self.model.eval()
         # Make sure that weight qconfig matches that of the serialized models
@@ -1271,6 +1643,14 @@ class QuantizedModelManager(ProfiledModelManager):
         torch.quantization.prepare(self.model, inplace=True)
 
     def quantize(self) -> None:
+        """
+        Quantize the model using the prepared configuration.
+
+        This method:
+        1. Prepares the model for quantization
+        2. Calibrates the model using the victim model's training data
+        3. Converts the model to a quantized version
+        """
         self.prepare_for_quantization()
         # calibrate model
         dl_iter = tqdm(self.victim_manager.dataset.train_acc_dl)
@@ -1279,14 +1659,29 @@ class QuantizedModelManager(ProfiledModelManager):
             self.model(x)
         torch.quantization.convert(self.model, inplace=True)
 
-    def loadQuantizedModel(self, path: Path):
+    def loadQuantizedModel(self, path: Path) -> None:
+        """
+        Load a quantized model from a checkpoint.
+
+        Args:
+            path (Path): Path to the quantized model checkpoint
+        """
         self.prepare_for_quantization()
         torch.quantization.convert(self.model, inplace=True)
         self.loadModel(path)
 
     @staticmethod
-    def load(model_path: Path, gpu: int = -1):
-        """model_path is a path to the quantized model checkpoint"""
+    def load(model_path: Path, gpu: int = -1) -> 'QuantizedModelManager':
+        """
+        Create a QuantizedModelManager from a saved quantized model checkpoint.
+
+        Args:
+            model_path (Path): Path to the quantized model checkpoint
+            gpu (int): GPU device number (-1 for CPU)
+
+        Returns:
+            QuantizedModelManager: Loaded quantized model manager instance
+        """
         quantized_folder = Path(model_path).parent
         victim_model_path = quantized_folder.parent / VictimModelManager.MODEL_FILENAME
         conf = ModelManagerBase.loadConfig(quantized_folder)
@@ -1299,6 +1694,21 @@ class QuantizedModelManager(ProfiledModelManager):
 
 
 class PruneModelManager(ProfiledModelManager):
+    """
+    Manages pruned versions of victim models.
+
+    This class handles the creation and management of pruned versions of victim models,
+    supporting both unstructured and structured pruning strategies.
+
+    Attributes:
+        FOLDER_NAME (str): Name of the folder for pruned models
+        MODEL_FILENAME (str): Name of the pruned model checkpoint file
+        ratio (float): Pruning ratio (fraction of weights to prune)
+        finetune_epochs (int): Number of epochs to finetune after pruning
+        victim_manager (VictimModelManager): The original victim model manager
+        pruned_modules (List[Tuple[torch.nn.Module, str]]): List of modules to prune
+    """
+
     FOLDER_NAME = "prune"
     MODEL_FILENAME = "pruned.pt"
 
@@ -1308,10 +1718,25 @@ class PruneModelManager(ProfiledModelManager):
         ratio: float = 0.5,
         finetune_epochs: int = 20,
         gpu: int = -1,
-        load_path: Path = None,
+        load_path: Optional[Path] = None,
         save_model: bool = True,
-        debug: int = None,
+        debug: Optional[int] = None,
     ) -> None:
+        """
+        Initialize a pruned model manager.
+
+        Args:
+            victim_model_path (Path): Path to the victim model checkpoint
+            ratio (float): Fraction of weights to prune (0.0 to 1.0)
+            finetune_epochs (int): Number of epochs to finetune after pruning
+            gpu (int): GPU device number (-1 for CPU)
+            load_path (Optional[Path]): Path to existing pruned model if loading
+            save_model (bool): Whether to save model checkpoints
+            debug (Optional[int]): Number of iterations to run in debug mode
+
+        Raises:
+            AssertionError: If victim model is not trained
+        """
         self.victim_manager = VictimModelManager.load(victim_model_path, gpu=gpu)
         assert self.victim_manager.config["epochs_trained"] > 0
         path = self.victim_manager.path / self.FOLDER_NAME
@@ -1357,7 +1782,13 @@ class PruneModelManager(ProfiledModelManager):
         )
 
     def prune(self) -> None:
-        # modifies self.model (through self.pruned_params)
+        """
+        Prune the model using L1 unstructured pruning.
+
+        This method:
+        1. Applies L1 unstructured pruning to the selected modules
+        2. Updates the configuration with sparsity information
+        """
         prune.global_unstructured(
             self.pruned_modules,
             pruning_method=prune.L1Unstructured,
@@ -1366,14 +1797,20 @@ class PruneModelManager(ProfiledModelManager):
         self.updateConfigSparsity()
 
     def paramsToPrune(
-        self, min_dims=None, conv_only=False
+        self,
+        min_dims: Optional[int] = None,
+        conv_only: bool = False
     ) -> List[Tuple[torch.nn.Module, str]]:
         """
-        min_dims (int, default None) - if provided, will only add modules
-            whose weight parameter has at least min_dims dimensions.  This
-            is used for structured pruning.
-        conv_only (bool, default False) - if enabled, will only prune
-            convolution layers.
+        Get list of parameters to prune.
+
+        Args:
+            min_dims (Optional[int]): If provided, only add modules whose weight
+                parameter has at least min_dims dimensions. Used for structured pruning.
+            conv_only (bool): If True, only prune convolution layers.
+
+        Returns:
+            List[Tuple[torch.nn.Module, str]]: List of (module, parameter_name) pairs to prune
         """
         res = []
         for name, module in self.model.named_modules():
@@ -1391,6 +1828,15 @@ class PruneModelManager(ProfiledModelManager):
         return res
 
     def updateConfigSparsity(self) -> None:
+        """
+        Update configuration with sparsity information.
+
+        Calculates and stores:
+        - Per-module sparsity percentages
+        - Total number of parameters
+        - Number of zero parameters
+        - Total sparsity percentage
+        """
         sparsity = {"module_sparsity": {}}
 
         pruned_mods_reformatted = {}
@@ -1433,9 +1879,17 @@ class PruneModelManager(ProfiledModelManager):
         self.saveConfig()
 
     @staticmethod
-    def load(model_path: Path, gpu: int = -1):
-        """model_path is a path to the pruned model checkpoint"""
+    def load(model_path: Path, gpu: int = -1) -> 'PruneModelManager':
+        """
+        Create a PruneModelManager from a saved pruned model checkpoint.
 
+        Args:
+            model_path (Path): Path to the pruned model checkpoint
+            gpu (int): GPU device number (-1 for CPU)
+
+        Returns:
+            PruneModelManager: Loaded pruned model manager instance
+        """
         load_folder = Path(model_path).parent  # the prune folder
         victim_path = load_folder.parent / VictimModelManager.MODEL_FILENAME
         conf = ModelManagerBase.loadConfig(load_folder)
@@ -1449,11 +1903,33 @@ class PruneModelManager(ProfiledModelManager):
 
 
 class StructuredPruneModelManager(PruneModelManager):
+    """
+    Manages structured pruning of victim models.
+
+    This class extends PruneModelManager to implement structured pruning, which removes
+    entire channels or filters from convolutional layers. This can lead to more efficient
+    models than unstructured pruning.
+
+    Attributes:
+        FOLDER_NAME (str): Name of the folder for structured pruned models
+        MODEL_FILENAME (str): Name of the structured pruned model checkpoint file
+    """
+
     FOLDER_NAME = "structured_prune"
     MODEL_FILENAME = "structured_pruned.pt"
 
     def prune(self) -> None:
-        # modifies self.model (through self.pruned_params)
+        """
+        Prune the model using L2 structured pruning.
+
+        This method:
+        1. Applies L2 structured pruning to the selected modules
+        2. Updates the configuration with sparsity information
+
+        Note:
+            Uses L2 norm for pruning and operates on the channel dimension (dim=1)
+            of convolutional layers.
+        """
         for module, name in self.pruned_modules:
             prune.ln_structured(
                 module=module,
@@ -1465,15 +1941,25 @@ class StructuredPruneModelManager(PruneModelManager):
         self.updateConfigSparsity()
 
     def paramsToPrune(
-        self, min_dims=2, conv_only=True
+        self,
+        min_dims: int = 2,
+        conv_only: bool = True
     ) -> List[Tuple[torch.nn.Module, str]]:
         # override superclass implementation and change default args
         return super().paramsToPrune(min_dims, conv_only)
 
     @staticmethod
-    def load(model_path: Path, gpu: int = -1):
-        """model_path is a path to the pruned model checkpoint"""
+    def load(model_path: Path, gpu: int = -1) -> 'StructuredPruneModelManager':
+        """
+        Create a StructuredPruneModelManager from a saved structured pruned model checkpoint.
 
+        Args:
+            model_path (Path): Path to the structured pruned model checkpoint
+            gpu (int): GPU device number (-1 for CPU)
+
+        Returns:
+            StructuredPruneModelManager: Loaded structured pruned model manager instance
+        """
         load_folder = Path(model_path).parent  # the prune folder
         victim_path = load_folder.parent / VictimModelManager.MODEL_FILENAME
         conf = ModelManagerBase.loadConfig(load_folder)
@@ -1488,8 +1974,21 @@ class StructuredPruneModelManager(PruneModelManager):
 
 class SurrogateModelManager(ModelManagerBase):
     """
-    Constructs the surrogate model with a paired victim model,
-    trains using from the labels from victim model.
+    Manages surrogate models for model extraction attacks.
+
+    This class handles the creation and training of surrogate models that mimic victim models.
+    It supports both knowledge distillation and knockoff transfer set training strategies.
+    The surrogate model is trained to match the victim model's predictions.
+
+    Attributes:
+        FOLDER_NAME (str): Name of the folder for surrogate models
+        victim_model (Union[VictimModelManager, PruneModelManager, QuantizedModelManager]): 
+            The victim model being mimicked
+        arch_pred_model_name (str): Name of the architecture prediction model used
+        arch_confidence (float): Confidence score of architecture prediction
+        pretrained (bool): Whether the model uses pretrained weights
+        knockoff_transfer_set (Optional[Tuple[Path, Dataset]]): Transfer set for knockoff training
+        train_with_transfer_set (bool): Whether to use transfer set for training
     """
 
     FOLDER_NAME = "surrogate"
@@ -1501,18 +2000,29 @@ class SurrogateModelManager(ModelManagerBase):
         arch_conf: float,
         arch_pred_model_name: str,
         pretrained: bool = False,
-        load_path: Path = None,
+        load_path: Optional[Path] = None,
         gpu: int = -1,
         save_model: bool = True,
         data_idx: int = 1,
-    ):
+    ) -> None:
         """
-        If load_path is not none, it should be a path to model.
-        See SurrogateModelManager.load().
+        Initialize a surrogate model manager.
 
-        Note - the self.config only accounts for keeping track of one history of
-        victim model architecture prediction.
-        Assumes victim model has been profiled/predicted.
+        Args:
+            victim_model_path (Path): Path to the victim model checkpoint
+            architecture (str): Architecture of the surrogate model
+            arch_conf (float): Confidence score of architecture prediction
+            arch_pred_model_name (str): Name of the architecture prediction model
+            pretrained (bool): Whether to use pretrained weights
+            load_path (Optional[Path]): Path to existing surrogate model if loading
+            gpu (int): GPU device number (-1 for CPU)
+            save_model (bool): Whether to save model checkpoints
+            data_idx (int): Index for dataset subset
+
+        Note:
+            The self.config only accounts for keeping track of one history of
+            victim model architecture prediction. Assumes victim model has been
+            profiled/predicted.
         """
         self.victim_model = self.loadVictim(victim_model_path, gpu=gpu)
         if isinstance(self.victim_model, VictimModelManager):
@@ -1592,7 +2102,23 @@ class SurrogateModelManager(ModelManagerBase):
         random_policy: bool = False,
         entropy: bool = True,
         force: bool = False,
-    ):
+    ) -> None:
+        """
+        Load a knockoff transfer set for training the surrogate model.
+
+        Args:
+            dataset_name (str): Name of dataset to use for transfer set
+            transfer_size (int): Size of transfer set to generate
+            sample_avg (int): Number of samples per class for entropy estimation
+            random_policy (bool): If True, use random sampling strategy
+            entropy (bool): If True, use entropy for adaptive sampling
+            force (bool): If True, generate new transfer set if none exists
+
+        Note:
+            The transfer set is used to train the surrogate model using the
+            knockoff nets approach. This can be more efficient than pure
+            knowledge distillation.
+        """
         self.knockoff_transfer_set = self.victim_model.loadKnockoffTransferSet(
             dataset_name=dataset_name,
             transfer_size=transfer_size,
@@ -1617,10 +2143,19 @@ class SurrogateModelManager(ModelManagerBase):
         )
 
     @staticmethod
-    def load(model_path: str, gpu: int = -1):
+    def load(model_path: str, gpu: int = -1) -> 'SurrogateModelManager':
         """
-        model_path is a path to a surrogate models checkpoint,
-        they are stored under {victim_model_path}/surrogate_{time}/checkpoint.pt
+        Create a SurrogateModelManager from a saved surrogate model checkpoint.
+
+        Args:
+            model_path (str): Path to the surrogate model checkpoint
+            gpu (int): GPU device number (-1 for CPU)
+
+        Returns:
+            SurrogateModelManager: Loaded surrogate model manager instance
+
+        Note:
+            The model path should be under {victim_model_path}/surrogate_{time}/checkpoint.pt
         """
         model_path = Path(model_path)
         vict_model_path = model_path.parent.parent / VictimModelManager.MODEL_FILENAME
@@ -1649,10 +2184,15 @@ class SurrogateModelManager(ModelManagerBase):
         return surrogate_manager
 
     @staticmethod
-    def loadVictimConfig(path: Path) -> dict:
+    def loadVictimConfig(path: Path) -> Dict[str, Any]:
         """
-        Given a path to a surrogate model manager folder,
-        load and return the associated victim model's config.
+        Load configuration from the associated victim model.
+
+        Args:
+            path (Path): Path to surrogate model manager folder
+
+        Returns:
+            Dict[str, Any]: Configuration dictionary from victim model
         """
         return VictimModelManager.loadConfig(path.parent)
 
@@ -1662,9 +2202,27 @@ class SurrogateModelManager(ModelManagerBase):
         optimizer: torch.optim.Optimizer,
         loss_fn: Callable,
         lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
-        debug: int = None,
+        debug: Optional[int] = None,
         run_attack: bool = True,
-    ):
+    ) -> Dict[str, float]:
+        """
+        Collect metrics for a training epoch.
+
+        Args:
+            epoch_num (int): Current epoch number
+            optimizer (torch.optim.Optimizer): Model optimizer
+            loss_fn (Callable): Loss function
+            lr_scheduler (torch.optim.lr_scheduler._LRScheduler): Learning rate scheduler
+            debug (Optional[int]): Number of iterations to run in debug mode
+            run_attack (bool): Whether to run transfer attack during training
+
+        Returns:
+            Dict[str, float]: Dictionary of metrics including:
+                - Training/validation loss and accuracy
+                - Agreement with victim model
+                - L1 weight norm difference
+                - Transfer attack success rate
+        """
         loss, acc1, acc5, agreement = self.runEpoch(
             train=True,
             epoch=epoch_num,
@@ -1714,16 +2272,32 @@ class SurrogateModelManager(ModelManagerBase):
         optim: torch.optim.Optimizer,
         loss_fn: Callable,
         lr_scheduler: torch.optim.lr_scheduler._LRScheduler,
-        debug: int = None,
-    ) -> tuple[int]:
+        debug: Optional[int] = None,
+    ) -> Tuple[float, float, float, float]:
         """
-        Run a single epoch.
-        Uses loss between vitim model predictions and surrogate model predictions.
-        validation is done on victim's validation dataset.
-        agreement is the percent of samples for which the victim and surrogate's
-        top1 prediction is the same.
-        """
+        Run a single training or validation epoch.
 
+        Args:
+            train (bool): Whether this is a training epoch
+            epoch (int): Current epoch number
+            optim (torch.optim.Optimizer): Model optimizer
+            loss_fn (Callable): Loss function
+            lr_scheduler (torch.optim.lr_scheduler._LRScheduler): Learning rate scheduler
+            debug (Optional[int]): Number of iterations to run in debug mode
+
+        Returns:
+            Tuple[float, float, float, float]: Tuple containing:
+                - Loss value
+                - Top-1 accuracy
+                - Top-5 accuracy
+                - Agreement percentage with victim model
+
+        Note:
+            Uses L1 loss between victim model predictions and surrogate model predictions.
+            Validation is done on victim's validation dataset.
+            Agreement is the percentage of samples where victim and surrogate's
+            top-1 predictions match.
+        """
         self.model.eval()
         prefix = "val"
         dl = self.victim_model.dataset.val_dl
@@ -1795,17 +2369,34 @@ class SurrogateModelManager(ModelManagerBase):
         eps: float = 8 / 255,
         step_size: float = 2 / 255,
         iterations: int = 10,
-        norm=np.inf,
-        debug: int = None,
+        norm: float = np.inf,
+        debug: Optional[int] = None,
     ) -> Dict[str, Union[float, int]]:
         """
-        Run a transfer attack, generating adversarial inputs on
-        surrogate model and applying them to the victim model.
-        Code adapted from cleverhans tutorial
+        Run a transfer attack using Projected Gradient Descent.
+
+        Generates adversarial examples on the surrogate model and tests their
+        transferability to the victim model.
+
+        Args:
+            dataset (Dataset): Dataset to run attack on
+            dataloader_name (str): Name of dataloader to use (e.g. "train_dl", "val_dl")
+            eps (float): Maximum perturbation size
+            step_size (float): Step size for gradient updates
+            iterations (int): Number of PGD iterations
+            norm (float): Norm for projection (default: inf)
+            debug (Optional[int]): Number of iterations to run in debug mode
+
+        Returns:
+            Dict[str, Union[float, int]]: Dictionary containing:
+                - Number of inputs tested
+                - Accuracy metrics for both models
+                - Transfer attack success rate
+                - Runtime and parameters
+
+        Note:
+            Code adapted from cleverhans tutorial:
         https://github.com/cleverhans-lab/cleverhans/blob/master/tutorials/torch/cifar10_tutorial.py
-        dataset name is the name of the class attribute of the dataset,
-        for example "train_dl" corresponds to dataset.train_dl,
-        see datasets.Dataset class
         """
         topk = (1, 5)
 
@@ -1913,7 +2504,22 @@ class SurrogateModelManager(ModelManagerBase):
             self.saveConfig()
         return results
 
-    def loadVictim(self, victim_model_path: str, gpu: int):
+    def loadVictim(
+        self,
+        victim_model_path: str,
+        gpu: int
+    ) -> Union[VictimModelManager, PruneModelManager, QuantizedModelManager]:
+        """
+        Load the victim model based on its type.
+
+        Args:
+            victim_model_path (str): Path to victim model checkpoint
+            gpu (int): GPU device number (-1 for CPU)
+
+        Returns:
+            Union[VictimModelManager, PruneModelManager, QuantizedModelManager]:
+                The appropriate type of victim model manager based on the model path
+        """
         victim_folder = Path(victim_model_path).parent
         if victim_folder.name == PruneModelManager.FOLDER_NAME:
             return PruneModelManager.load(model_path=victim_model_path, gpu=gpu)
@@ -1923,29 +2529,64 @@ class SurrogateModelManager(ModelManagerBase):
 
 
 def getVictimSurrogateModels(
-    architectures: List[str] = None,
-    victim_args: dict = {},
-    surrogate_args: dict = {},
+    architectures: Optional[List[str]] = None,
+    victim_args: Dict[str, Any] = {},
+    surrogate_args: Dict[str, Any] = {},
 ) -> Dict[Path, List[Path]]:
     """
-    Given args for victim and surrogate models, return a
-    dictionary of {victim_model_path: [paths of surrogate models associated
-    with this victim model]}.
+    Get paths to victim models and their associated surrogate models that match specified criteria.
 
-    Only the victim and surrogate models whose args match those
-    provided will be returned.
+    This function searches for victim models and their surrogate models that match the provided
+    architecture and configuration arguments. It returns a mapping from victim model paths to
+    lists of associated surrogate model paths.
+
+    Args:
+        architectures (Optional[List[str]]): List of model architectures to filter by.
+            If None, all architectures are considered.
+        victim_args (Dict[str, Any]): Dictionary of configuration parameters that victim
+            models must match. Keys should match configuration parameters in the victim
+            model's config file.
+        surrogate_args (Dict[str, Any]): Dictionary of configuration parameters that surrogate
+            models must match. Keys should match configuration parameters in the surrogate
+            model's config file.
+
+    Returns:
+        Dict[Path, List[Path]]: Dictionary mapping victim model paths to lists of associated
+            surrogate model paths. Only includes victim models that have at least one matching
+            surrogate model.
+
+    Example:
+        ```python
+        # Find all ResNet18 victim models and their surrogate models trained with
+        # knowledge distillation
+        models = getVictimSurrogateModels(
+            architectures=["resnet18"],
+            victim_args={"dataset": "cifar10"},
+            surrogate_args={"knockoff_transfer_set": None}
+        )
+        ```
     """
 
     def validManager(
         victim_path: Path,
-    ) -> Dict[VictimModelManager, List[SurrogateModelManager]]:
+    ) -> Dict[Path, List[Path]]:
         """
-        Given a path to a victim model manger object, determine if
-        its configuration matches the provided args and if it has a surrogate
-        model that matches the provided args.
+        Check if a victim model and its surrogate models match the specified criteria.
 
-        Returns [(path to victim, path to surrogate)] if config matches
-        and [] if not.
+        This helper function checks if a victim model's configuration matches the provided
+        victim_args and if it has any surrogate models that match the surrogate_args.
+
+        Args:
+            victim_path (Path): Path to the victim model checkpoint file.
+
+        Returns:
+            Dict[Path, List[Path]]: Dictionary containing the victim path as key and a list
+                of matching surrogate model paths as value. Returns empty dict if victim
+                model doesn't match criteria.
+
+        Note:
+            The function checks both the victim model's configuration and the configurations
+            of all surrogate models in the victim model's directory.
         """
         vict_config = VictimModelManager.loadConfig(victim_path.parent)
         # check victim
@@ -1973,32 +2614,51 @@ def getVictimSurrogateModels(
 
 
 def getModelsFromSurrogateTrainStrategies(
-    strategies: dict,
+    strategies: Dict[str, Dict[str, Any]],
     architectures: List[str],
     latest_file: bool = True,
 ) -> Dict[str, Dict[str, Path]]:
     """
-    architectures is a list of DNN architecture strings, like config.MODELS
+    Get paths to surrogate models that match specified training strategies and architectures.
 
-    The strategies input is keyed by an arbitrary name given to a surrogate model
-    training strategy.  The value associated with that key is dict of arguments
-    to be matched with the surrogate model's config. Notable elements are:
-        knockoff_transfer_set - will be None for pure knowledge distillation
-            training, otherwise is a dict specifying the arguments: dataset,
-            transfer_size, sample_avg, random_policy, and entropy.
-        pretrained - boolean
+    This function searches for surrogate models that match the provided training strategies
+    and architectures. It returns a nested dictionary mapping strategy names to architecture
+    names to model paths.
 
-    an example of the strategies input would be:
-    {
-        "knowledge_dist" : {
+    Args:
+        strategies (Dict[str, Dict[str, Any]]): Dictionary mapping strategy names to their
+            configuration parameters. Each strategy configuration should include:
+            - pretrained (bool): Whether the model uses pretrained weights
+            - knockoff_transfer_set (Optional[Dict[str, Any]]): Configuration for knockoff
+                training. If None, indicates pure knowledge distillation. If specified,
+                should include:
+                - dataset_name (str): Name of dataset used
+                - transfer_size (int): Size of transfer set
+                - sample_avg (int): Number of samples per class
+                - random_policy (bool): Whether to use random sampling
+                - entropy (bool): Whether to use entropy for sampling
+        architectures (List[str]): List of model architectures to search for
+        latest_file (bool): If True, return the most recent model file when multiple
+            matches are found. If False, return the oldest file.
+
+    Returns:
+        Dict[str, Dict[str, Path]]: Nested dictionary where:
+            - Outer key is strategy name
+            - Inner key is architecture name
+            - Value is path to matching surrogate model
+
+    Raises:
+        AssertionError: If no matching surrogate model is found for any
+            architecture-strategy combination
+
+    Example:
+        ```python
+        strategies = {
+            "knowledge_dist": {
             "pretrained": False,
             "knockoff_transfer_set": None,
         },
-        "knowledge_dist_pretrained" : {
-            "pretrained": True,
-            "knockoff_transfer_set": None,
-        },
-        "knockoff1" : {
+            "knockoff1": {
             "pretrained": False,
             "knockoff_transfer_set": {
                 "dataset_name": "cifar100",
@@ -2009,30 +2669,25 @@ def getModelsFromSurrogateTrainStrategies(
             },
         },
     }
-
-    The return value of this function is a dict with the same keys as
-    the strategies input.  The value for a key is another dict keyed by model
-    architecture (only including the provided architectures).  The values are a path to
-    a surrogate model which matches the args to the surrogate model training
-    strategy. An error is raised if there is not a valid surrogate model for any
-    of the provided architectures.
-
-    For example, if the input is the strategies example as above, and the
-    architectures input is ["resnet18", "googlenet"] then the output would be
-    {
-        "knowledge_dist" : {
-            "resnet18": <path to resnet18 surrogate model satisfying knowledge_dist>,
-            "googlenet": <path to googlenet surrogate model satisfying knowledge_dist>,
-        },
-        "knowledge_dist_pretrained" : {
-            "resnet18": <path to resnet18 surrogate model satisfying knowledge_dist_pretrained>,
-            "googlenet": <path to googlenet surrogate model satisfying knowledge_dist_pretrained>,
-        },
-        "knockoff1" : {
-            "resnet18": <path to resnet18 surrogate model satisfying knockoff1>,
-            "googlenet": <path to googlenet surrogate model satisfying knockoff1>,
-        },
-    }
+        architectures = ["resnet18", "googlenet"]
+        
+        models = getModelsFromSurrogateTrainStrategies(
+            strategies=strategies,
+            architectures=architectures,
+            latest_file=True
+        )
+        # Returns:
+        # {
+        #     "knowledge_dist": {
+        #         "resnet18": <path to resnet18 surrogate model>,
+        #         "googlenet": <path to googlenet surrogate model>,
+        #     },
+        #     "knockoff1": {
+        #         "resnet18": <path to resnet18 surrogate model>,
+        #         "googlenet": <path to googlenet surrogate model>,
+        #     },
+        # }
+        ```
     """
     result = {}
     for strategy in strategies:
@@ -2061,7 +2716,3 @@ def getModelsFromSurrogateTrainStrategies(
             ), f"Could not find any surrogate models with arch {arch} and strategy {strategies[strategy]}"
         result[strategy] = strategy_result
     return result
-
-
-if __name__ == "__main__":
-    sys.exit(0)

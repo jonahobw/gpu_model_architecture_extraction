@@ -67,64 +67,43 @@ Training metrics:
 
 import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import rc
 
-# plt.style.use('ggplot')
-
+# Configure matplotlib settings
 rc("font", **{"family": "serif", "serif": ["Times"], "size": 16})
 rc("figure", **{"figsize": (7, 5)})
 
 import sys
 
-# setting path
+# Add parent directory to path for imports
 sys.path.append("../edge_profile")
 
 from config import MODELS
 from get_model import model_families, name_to_family
-from model_manager import (SurrogateModelManager, VictimModelManager,
-                           getModelsFromSurrogateTrainStrategies,
-                           getVictimSurrogateModels)
+from model_manager import (
+    SurrogateModelManager,
+    VictimModelManager,
+    getModelsFromSurrogateTrainStrategies,
+    getVictimSurrogateModels,
+)
 
+# Constants
 SAVE_FOLDER = Path(__file__).parent.absolute() / "surrogate_acc"
 SAVE_FOLDER.mkdir(exist_ok=True)
 
-"""
-def getVictimSurrogateAccs(models: List[Tuple[Path, Path]], dataset) -> Tuple[List[str], List[float], List[float]]:
-    acc_config_name = f"entire_{dataset}_val_acc"
-
-    labels = []
-    victim_accs = []
-    surrogate_accs = []
-
-    for _, surrogate_path in models:
-        surrogate_manager = SurrogateModelManager.load(surrogate_path)
-        labels.append(surrogate_manager.model_name)
-        # get surrogate acc
-        if acc_config_name not in surrogate_manager.config:
-            surrogate_manager.config[acc_config_name] = (surrogate_manager.topKAcc(surrogate_manager.dataset.val_dl, topk=(1))[1] + surrogate_manager.topKAcc(surrogate_manager.victim_model.dataset.val_dl, topk=(1))[1]) / 2
-            surrogate_manager.saveConfig()
-        surrogate_accs.append(surrogate_manager.config[acc_config_name])
-        # get victim acc
-        if acc_config_name not in surrogate_manager.victim_model.config:
-            surrogate_manager.victim_model.config = (surrogate_manager.victim_model.topKAcc(surrogate_manager.dataset.val_dl, topk=(1))[1] + surrogate_manager.victim_model.topKAcc(surrogate_manager.victim_model.dataset.val_dl, topk=(1))[1]) / 2
-            surrogate_manager.victim_model.saveConfig()
-        victim_accs.append(surrogate_manager.victim_model.config[acc_config_name])
-    return labels, victim_accs, surrogate_accs
-"""
-
 
 def plotMetricByModelAndStrategy(
-    strategies: dict,
+    strategies: Dict[str, Dict],
     models: List[str],
     metric: str,
     absolute: bool = False,
     include_victim: bool = True,
     save: bool = True,
-):
+) -> None:
     """
     Note this currently assumes that there is only 1 victim model per architecture.
 
@@ -147,10 +126,18 @@ def plotMetricByModelAndStrategy(
     This is the same plot as above but in absolute rather than relative terms.
     For example, for accuracy, this will plot the surrogate and victim accuracy
     side-by-side.
+
+    Args:
+        strategies (Dict[str, Dict]): Dictionary mapping strategy names to their parameters
+        models (List[str]): List of model architectures to include
+        metric (str): Metric to plot (e.g., 'val_acc1', 'train_loss')
+        absolute (bool): If True, plot absolute values; if False, plot relative to victim
+        include_victim (bool): Whether to include victim model metrics
+        save (bool): Whether to save the plot to a file
     """
     if not include_victim:
         assert absolute, """Cannot plot surrogate metrics relative to victim model
-        if include_victim is False.  Either set include_victim to True or set 
+        if include_victim is False. Either set include_victim to True or set 
         absolute to True."""
 
     plt.cla()
@@ -163,7 +150,6 @@ def plotMetricByModelAndStrategy(
     # will be a 2d list of [[architecture1_name, metric under strategy 1,
     # metric under strategy 2 ...], [architecture2_name, ...], ...]
     data = []
-
     for model in models:
         model_data = [model]
         try:
@@ -181,16 +167,18 @@ def plotMetricByModelAndStrategy(
 
         data.append(model_data)
 
+    # Sort and prepare data for plotting
     data = sorted(data, key=lambda x: x[0])
     x_labels = [x[0] for x in data]
-    x = np.arange(len(x_labels))  # the label locations
-    width = 0.8  # the width of all bars for a single architecture
-    bar_width = width / len(strategies)  # width of a single bar
+    x = np.arange(len(x_labels))
+    width = 0.8
+    bar_width = width / len(strategies)
 
     if absolute and include_victim:
         # account for the victim model bar
         bar_width = width / (len(strategies) + 1)
 
+    # Create the plot
     fig, ax = plt.subplots()
     for i, strategy_name in enumerate(strategy_labels):
         offset = (-1 * width / 2) + (i * bar_width) + (bar_width / 2)
@@ -208,7 +196,7 @@ def plotMetricByModelAndStrategy(
         victim_data = [x[-1] for x in data]
         ax.bar(x - offset, victim_data, bar_width, label="victim_model")
 
-    # Add some text for labels, title and custom x-axis tick labels, etc.
+    # Customize the plot
     y_label = f"{metric}" if absolute else f"Surrogate {metric}/ Victim {metric}"
     ax.set_ylabel(y_label)
     title = f"Surrogate {metric} Relative to Victim {metric}\nby Training Strategy and DNN Architecture"
@@ -219,6 +207,8 @@ def plotMetricByModelAndStrategy(
     ax.legend(loc="lower right")
     plt.xticks(rotation=45, ha="right")
     fig.tight_layout()
+
+    # Save or show the plot
     if save:
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         plt.savefig(
@@ -231,18 +221,32 @@ def plotMetricByModelAndStrategy(
 
 
 def plotMultipleTrainingMetrics(
-    strategies: dict,
+    strategies: Dict[str, Dict],
     models: List[str],
     metrics: List[str],
-    y_lim: Tuple[float, float] = None,
+    y_lim: Optional[Tuple[float, float]] = None,
     save: bool = True,
     normalize: bool = False,
-):
+) -> None:
     """
-    plot multiple metrics averaged by model architecture for a single
+    Plot multiple training metrics averaged across model architectures, for a single
     surrogate model training strategy.
 
     The number of training epochs must be the same for each model.
+
+    Args:
+        strategies (Dict[str, Dict]): Dictionary mapping strategy names to their parameters
+        models (List[str]): List of model architectures to include
+        metrics (List[str]): List of metrics to plot
+        y_lim (Optional[Tuple[float, float]]): Y-axis limits
+        save (bool): Whether to save the plot to a file
+        normalize (bool): Whether to normalize the metrics
+
+    The plot shows:
+    - Multiple metrics over training epochs
+    - Averaged values across model architectures
+    - Optional normalization
+    - Training progress visualization
     """
     plt.cla()
     assert len(strategies) == 1
@@ -278,13 +282,13 @@ def plotMultipleTrainingMetrics(
             )
             raise e
 
+    # Create the plot
     x_axis = list(range(1, num_epochs + 1))
-
     for metric in data:
         avg_metric = [data[metric][i] / len(models) for i in range(num_epochs)]
         plt.plot(x_axis, avg_metric, label=metric)
 
-    # Add some text for labels, title and custom x-axis tick labels, etc.
+    # Customize the plot
     arch_str = (
         f"{str(models)}"[1:-1].replace("'", "") if len(models) < 4 else str(len(models))
     )
@@ -303,6 +307,8 @@ def plotMultipleTrainingMetrics(
     if y_lim is not None:
         plt.ylim(y_lim)
     plt.tight_layout()
+
+    # Save or show the plot
     if save:
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         plt.savefig(SAVE_FOLDER / f"{strategy_name}_{timestamp}.png", dpi=500)
@@ -311,18 +317,31 @@ def plotMultipleTrainingMetrics(
 
 
 def plotOneMetricPerModel(
-    strategies: dict,
+    strategies: Dict[str, Dict],
     models: List[str],
     metric: str,
-    y_lim: Tuple[float, float] = None,
+    y_lim: Optional[Tuple[float, float]] = None,
     save: bool = True,
     normalize: bool = False,
     include_victim: bool = False,
-):
+) -> None:
     """
-    plot a single metric (e.g. train_acc1) compared across different
-    surrogate model training strategies, averaged by model architecture.
-    x axis is training epoch
+    Plot a single metric across different training strategies, averaged by model, with training epochs on the x axis.
+
+    Args:
+        strategies (Dict[str, Dict]): Dictionary mapping strategy names to their parameters
+        models (List[str]): List of model architectures to include
+        metric (str): Metric to plot
+        y_lim (Optional[Tuple[float, float]]): Y-axis limits
+        save (bool): Whether to save the plot to a file
+        normalize (bool): Whether to normalize the metric
+        include_victim (bool): Whether to include victim model metrics
+
+    The plot shows:
+    - Single metric over training epochs
+    - Comparison across training strategies
+    - Optional victim model comparison
+    - Averaged values across model architectures
     """
     plt.cla()
     # manager_paths is a dict of {strategy name: {architecture_name: path to surrogate model}}
@@ -336,7 +355,6 @@ def plotOneMetricPerModel(
 
     # will be a dict of {metric: [metric per epoch over training, summed over the architectures]}
     data = {strategy: [0] * num_epochs for strategy in strategies}
-
     if include_victim:
         data["victim"] = [0] * num_epochs
 
@@ -367,14 +385,14 @@ def plotOneMetricPerModel(
             print(f"Model: {model}\nPath: {path}\nEpochs trained: {num_epochs}")
             raise e
 
+    # Create the plot
     x_axis = list(range(1, num_epochs + 1))
-
     for strategy in data:
         avg_metric = [data[strategy][i] / len(models) for i in range(num_epochs)]
         plt.plot(x_axis, avg_metric, label=strategy)
         print(f"Avg Metric\n{avg_metric}")
 
-    # Add some text for labels, title and custom x-axis tick labels, etc.
+    # Customize the plot
     arch_str = (
         f"{str(models)}"[1:-1].replace("'", "") if len(models) < 4 else str(len(models))
     )
@@ -391,6 +409,8 @@ def plotOneMetricPerModel(
     if y_lim is not None:
         plt.ylim(y_lim)
     plt.tight_layout()
+
+    # Save or show the plot
     if save:
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         plt.savefig(SAVE_FOLDER / f"{strategy_name}_{timestamp}.png", dpi=500)
@@ -399,22 +419,34 @@ def plotOneMetricPerModel(
 
 
 def plotSingleMetricByModel(
-    strategies: dict,
+    strategies: Dict[str, Dict],
     models: List[str],
     metric: str,
-    y_lim: Tuple[float, float] = None,
+    y_lim: Optional[Tuple[float, float]] = None,
     save: bool = True,
     normalize: bool = False,
     label_family: bool = True,
-):
+) -> None:
     """
-    plot a single metric (e.g. train_acc1) compared across different
-    surrogate models (one line per model), for one training strategy
-    x axis is training epoch
+    Plot a single metric for different models under one training strategy, with training epochs on the x axis.
+
+    Args:
+        strategies (Dict[str, Dict]): Dictionary mapping strategy names to their parameters
+        models (List[str]): List of model architectures to include
+        metric (str): Metric to plot
+        y_lim (Optional[Tuple[float, float]]): Y-axis limits
+        save (bool): Whether to save the plot to a file
+        normalize (bool): Whether to normalize the metric
+        label_family (bool): Whether to label by model family
+
+    The plot shows:
+    - Single metric over training epochs
+    - One line per model architecture
+    - Optional family-based coloring
+    - Training progress visualization
     """
     plt.cla()
     assert len(strategies) == 1
-    # manager_paths is a dict of {strategy name: {architecture_name: path to surrogate model}}
     manager_paths = getModelsFromSurrogateTrainStrategies(
         strategies=strategies, architectures=models
     )
@@ -423,7 +455,7 @@ def plotSingleMetricByModel(
         manager_paths[strategy_name][models[0]].parent
     )["epochs_trained"]
 
-    # will be a dict of {model_arch: [metric per epoch over training]}
+    # Collect and process data
     data = {arch: [0] * num_epochs for arch in models}
 
     for model in models:
@@ -443,11 +475,12 @@ def plotSingleMetricByModel(
             )
             raise e
 
+    # Create the plot
     x_axis = list(range(1, num_epochs + 1))
-
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     families = [x[0] for x in model_families]
     family_to_color = {families[i]: colors[i] for i in range(len(families))}
+    
     for model in models:
         if label_family:
             plt.plot(
@@ -459,6 +492,7 @@ def plotSingleMetricByModel(
         else:
             plt.plot(x_axis, data[model], label=model)
 
+    # Customize the plot
     plt.legend()
     if label_family:
         # ensure no repeating in legend
@@ -482,6 +516,8 @@ def plotSingleMetricByModel(
     if y_lim is not None:
         plt.ylim(y_lim)
     plt.tight_layout()
+
+    # Save or show the plot
     if save:
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         plt.savefig(SAVE_FOLDER / f"{strategy_name}_{timestamp}.png", dpi=500)
@@ -514,19 +550,14 @@ if __name__ == "__main__":
         },
     }
 
-    # the set of model architectures to use.
+    # Model selection
     models = MODELS
-    # models = ["resnet18"]
-    # models = [models[9]]
-    exclude = []
-    # exclude = ['vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19_bn', 'vgg19', 'squeezenet1_0', 'squeezenet1_1', 'mnasnet0_5', 'mnasnet0_75', 'mnasnet1_0', 'mnasnet1_3',]
     exclude = [
         "mnasnet0_5",
         "mnasnet0_75",
         "mnasnet1_3",
         "mnasnet1_0",
     ]
-    # exclude.extend(["alexnet", "resnet152", "resnext50_32x4d"])
     for ex in exclude:
         models.remove(ex)
 
@@ -540,6 +571,7 @@ if __name__ == "__main__":
     # plotOneMetricPerModel(strategies=strategies, models=models, metric="val_acc1", save=False, include_victim=True)
     # plotOneMetricPerModel(strategies=strategies, models=models, metric="val_loss", save=False, include_victim=True, y_lim=(0.001, 0.075))
     # plotOneMetricPerModel(strategies=strategies, models=models, metric="l1_weight_bound", save=False, normalize=True)
+    
     plotOneMetricPerModel(
         strategies=strategies,
         models=models,

@@ -1,10 +1,46 @@
+"""Experimental workflows for model training, profiling, and analysis.
+
+This module provides functionality for running various experimental workflows including:
+- Training victim and surrogate models
+- Model profiling and performance analysis
+- Model pruning and quantization
+- Architecture prediction and validation
+- Knockoff model training and evaluation
+
+The module supports multiple workflows:
+1. Victim Model Training:
+   - Train individual or multiple victim models
+   - Profile model performance
+   - Quantize models
+   - Prune models (structured and unstructured)
+
+2. Surrogate Model Training:
+   - Train surrogate models based on victim models
+   - Support for knockoff training
+   - Transfer learning capabilities
+   - Architecture prediction
+
+3. Model Analysis:
+   - Profile collection and organization
+   - Architecture prediction validation
+   - Performance metrics tracking
+   - Model family classification
+
+Dependencies:
+    - torch: For model operations
+    - torchvision: For model architectures
+    - numpy: For numerical operations
+    - pandas: For data handling
+    - pathlib: For file operations
+"""
+
 import datetime
 import json
 import shutil
 import time
 import traceback
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple, Union
 
 import config
 from architecture_prediction import ArchPredBase, get_arch_pred_model
@@ -19,81 +55,125 @@ from utils import dict_to_str, latest_file
 
 
 def trainOneVictim(
-    model_arch, epochs=150, gpu: int = -1, debug: int = None, save_model: bool = True
+    model_arch: str,
+    epochs: int = 150,
+    gpu: int = -1,
+    debug: Optional[int] = None,
+    save_model: bool = True
 ) -> VictimModelManager:
-    a = VictimModelManager(
+    """Train a single victim model.
+    
+    Args:
+        model_arch: Architecture name of the model to train
+        epochs: Number of training epochs
+        gpu: GPU device ID (-1 for CPU)
+        debug: Debug level (None for no debugging)
+        save_model: Whether to save the trained model
+        
+    Returns:
+        Trained VictimModelManager instance
+    """
+    manager = VictimModelManager(
         architecture=model_arch,
         dataset="cifar10",
         model_name=model_arch,
         gpu=gpu,
         save_model=save_model,
     )
-    a.trainModel(num_epochs=epochs, debug=debug)
-    return a
+    manager.trainModel(num_epochs=epochs, debug=debug)
+    return manager
 
 
 def continueVictimTrain(
-    vict_path: Path, epochs: int = 1, gpu: int = -1, debug: int = None
-):
+    vict_path: Path,
+    epochs: int = 1,
+    gpu: int = -1,
+    debug: Optional[int] = None
+) -> None:
+    """Continue training a victim model from a saved checkpoint.
+    
+    Args:
+        vict_path: Path to the saved model
+        epochs: Number of additional training epochs
+        gpu: GPU device ID (-1 for CPU)
+        debug: Debug level (None for no debugging)
+    """
     manager = VictimModelManager.load(model_path=vict_path, gpu=gpu)
     manager.trainModel(num_epochs=epochs, debug=debug, replace=True)
 
 
 def trainVictimModels(
-    epochs=150,
+    epochs: int = 150,
     gpu: int = -1,
     reverse: bool = False,
-    debug: int = None,
+    debug: Optional[int] = None,
     repeat: bool = False,
-    models: List[str] = None,
-):
+    models: Optional[List[str]] = None,
+) -> None:
+    """Train multiple victim models with progress tracking.
+    
+    Args:
+        epochs: Number of training epochs per model
+        gpu: GPU device ID (-1 for CPU)
+        reverse: Whether to process models in reverse order
+        debug: Debug level (None for no debugging)
+        repeat: Whether to retrain existing models
+        models: List of model architectures to train (None for all models)
+    """
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     file_path = Path.cwd() / f"train_progress_{timestamp}.txt"
-    f = open(file_path, "w")
+    
+    with open(file_path, "w") as f:
+        if models is None:
+            models = all_models
+        if reverse:
+            models.reverse()
+        start = time.time()
 
-    if models is None:
-        models = all_models
-    if reverse:
-        models.reverse()
-    start = time.time()
-
-    for i, model in enumerate(models):
-        iter_start = time.time()
-        if debug and i > debug:
-            break
-        model_arch_folder = Path.cwd() / "models" / model
-        if not repeat and model_arch_folder.exists():
-            continue
-        try:
-            manager = trainOneVictim(model, epochs=epochs, gpu=gpu, debug=debug)
-            f.write(f"{model} success\n")
-            config.EMAIL.email_update(
-                start=start,
-                iter_start=iter_start,
-                iter=i,
-                total_iters=len(models),
-                subject=f"Victim {model} Finished Training",
-                params=manager.config,
-            )
-        except Exception as e:
-            print(e)
-            f.write(
-                f"\n\n{model} failed, error\n{e}\ntraceback:\n{traceback.format_exc()}\n\n"
-            )
-            config.EMAIL.email(
-                f"Failed While Training {model}", f"{traceback.format_exc()}"
-            )
-    f.close()
+        for i, model in enumerate(models):
+            iter_start = time.time()
+            if debug and i > debug:
+                break
+            model_arch_folder = Path.cwd() / "models" / model
+            if not repeat and model_arch_folder.exists():
+                continue
+            try:
+                manager = trainOneVictim(model, epochs=epochs, gpu=gpu, debug=debug)
+                f.write(f"{model} success\n")
+                config.EMAIL.email_update(
+                    start=start,
+                    iter_start=iter_start,
+                    iter=i,
+                    total_iters=len(models),
+                    subject=f"Victim {model} Finished Training",
+                    params=manager.config,
+                )
+            except Exception as e:
+                print(e)
+                f.write(
+                    f"\n\n{model} failed, error\n{e}\ntraceback:\n{traceback.format_exc()}\n\n"
+                )
+                config.EMAIL.email(
+                    f"Failed While Training {model}", f"{traceback.format_exc()}"
+                )
 
 
 def profileAllVictimModels(
     gpu: int = 0,
-    prefix: str = None,
-    nvprof_args: dict = {},
+    prefix: Optional[str] = None,
+    nvprof_args: Dict = {},
     count: int = 1,
     add: bool = False,
-):
-    """Victim models must be trained already."""
+) -> None:
+    """Profile all victim models using NVIDIA profiler.
+    
+    Args:
+        gpu: GPU device ID
+        prefix: Optional prefix to filter model paths
+        nvprof_args: Additional arguments for nvprof
+        count: Number of profiling runs per model
+        add: Whether to add new profiles to existing ones
+    """
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         vict_manager = VictimModelManager.load(model_path=vict_path, gpu=gpu)
         assert vict_manager.config["epochs_trained"] > 0
@@ -110,19 +190,38 @@ def trainSurrogateModels(
     lr: List[float],
     predict: bool = True,
     arch_pred_model_type: str = "nn",
-    model_paths: List[str] = None,
-    gpu=0,
-    reverse=False,
-    debug=None,
+    model_paths: Optional[List[str]] = None,
+    gpu: int = 0,
+    reverse: bool = False,
+    debug: Optional[int] = None,
     save_model: bool = True,
-    df=None,
+    df: Optional[object] = None,
     average_profiles: bool = False,
-    filters: dict = None,
+    filters: Optional[Dict] = None,
     pretrained: bool = True,
     run_attack: bool = True,
     data_idx: int = 1,
-):
-    """Victim models must be trained and profiled already."""
+) -> None:
+    """Train surrogate models based on victim models.
+    
+    Args:
+        epochs: List of epochs for each training stage
+        patience: List of patience values for each stage
+        lr: List of learning rate multipliers for each stage
+        predict: Whether to predict architecture before training
+        arch_pred_model_type: Type of architecture prediction model
+        model_paths: List of victim model paths to use
+        gpu: GPU device ID
+        reverse: Whether to process models in reverse order
+        debug: Debug level (None for no debugging)
+        save_model: Whether to save trained models
+        df: Optional DataFrame for architecture prediction
+        average_profiles: Whether to average multiple profiles
+        filters: Optional filters for profile selection
+        pretrained: Whether to use pretrained models
+        run_attack: Whether to run attack evaluation
+        data_idx: Index of dataset split to use
+    """
     if model_paths is None:
         model_paths = VictimModelManager.getModelPaths()
     if reverse:
@@ -184,15 +283,25 @@ def trainSurrogateModels(
 
 
 def runTransferSurrogateModels(
-    prefix: str = None,
-    gpu=0,
-    eps=0.031372549,
-    step_size=0.0078431,
-    iterations=10,
+    prefix: Optional[str] = None,
+    gpu: int = 0,
+    eps: float = 0.031372549,
+    step_size: float = 0.0078431,
+    iterations: int = 10,
     train_data: bool = True,
-    debug: int = None,
-):
-    """Both surrogate and victim models must be trained already."""
+    debug: Optional[int] = None,
+) -> None:
+    """Run transfer attacks on surrogate models.
+    
+    Args:
+        prefix: Optional prefix to filter model paths
+        gpu: GPU device ID
+        eps: Maximum perturbation size
+        step_size: Step size for PGD attack
+        iterations: Number of PGD iterations
+        train_data: Whether to use training data
+        debug: Debug level (None for no debugging)
+    """
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         surrogate_manager = SurrogateModelManager.load(model_path=vict_path, gpu=gpu)
         surrogate_manager.transferAttackPGD(
@@ -204,8 +313,16 @@ def runTransferSurrogateModels(
         )
 
 
-def quantizeVictimModels(save: bool = True, prefix: str = None):
-    """Victim models must be trained already"""
+def quantizeVictimModels(
+    save: bool = True,
+    prefix: Optional[str] = None
+) -> None:
+    """Quantize victim models.
+    
+    Args:
+        save: Whether to save quantized models
+        prefix: Optional prefix to filter model paths
+    """
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         arch = vict_path.parent.parent.name
         if arch in quantized_models:
@@ -215,11 +332,20 @@ def quantizeVictimModels(save: bool = True, prefix: str = None):
 
 def profileAllQuantizedModels(
     gpu: int = 0,
-    prefix: str = None,
-    nvprof_args: dict = {},
+    prefix: Optional[str] = None,
+    nvprof_args: Dict = {},
     count: int = 1,
     add: bool = False,
-):
+) -> None:
+    """Profile all quantized models.
+    
+    Args:
+        gpu: GPU device ID
+        prefix: Optional prefix to filter model paths
+        nvprof_args: Additional arguments for nvprof
+        count: Number of profiling runs per model
+        add: Whether to add new profiles to existing ones
+    """
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         quant_path = (
             vict_path.parent
@@ -242,11 +368,21 @@ def pruneOneVictim(
     gpu: int = -1,
     save: bool = True,
     structured: bool = False,
-    debug: int = None,
-):
-    """Victim models must be trained already"""
+    debug: Optional[int] = None,
+) -> None:
+    """Prune a single victim model.
+    
+    Args:
+        vict_path: Path to the victim model
+        ratio: Pruning ratio
+        finetune_epochs: Number of fine-tuning epochs
+        gpu: GPU device ID (-1 for CPU)
+        save: Whether to save the pruned model
+        structured: Whether to use structured pruning
+        debug: Debug level (None for no debugging)
+    """
     constructor = StructuredPruneModelManager if structured else PruneModelManager
-    prune_manager = constructor(
+    constructor(
         victim_model_path=vict_path,
         ratio=ratio,
         finetune_epochs=finetune_epochs,
@@ -257,15 +393,25 @@ def pruneOneVictim(
 
 
 def pruneVictimModels(
-    prefix: str = None,
+    prefix: Optional[str] = None,
     ratio: float = 0.5,
     finetune_epochs: int = 20,
     gpu: int = -1,
     save: bool = True,
     structured: bool = False,
-    debug: int = None,
-):
-    """Victim models must be trained already"""
+    debug: Optional[int] = None,
+) -> None:
+    """Prune multiple victim models.
+    
+    Args:
+        prefix: Optional prefix to filter model paths
+        ratio: Pruning ratio
+        finetune_epochs: Number of fine-tuning epochs
+        gpu: GPU device ID (-1 for CPU)
+        save: Whether to save pruned models
+        structured: Whether to use structured pruning
+        debug: Debug level (None for no debugging)
+    """
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         pruneOneVictim(
             vict_path=vict_path,
@@ -279,9 +425,15 @@ def pruneVictimModels(
 
 
 def deletePrunedProfiles(
-    prefix: str = None,
+    prefix: Optional[str] = None,
     structured: bool = False,
-):
+) -> None:
+    """Delete profiles of pruned models.
+    
+    Args:
+        prefix: Optional prefix to filter model paths
+        structured: Whether to handle structured pruning profiles
+    """
     constructor = StructuredPruneModelManager if structured else PruneModelManager
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         prune_path = (
@@ -294,13 +446,22 @@ def deletePrunedProfiles(
 
 def profileAllPrunedModels(
     gpu: int = 0,
-    prefix: str = None,
-    nvprof_args: dict = {},
+    prefix: Optional[str] = None,
+    nvprof_args: Dict = {},
     count: int = 1,
     add: bool = False,
     structured: bool = False,
-):
-    """Pruned models must be trained already."""
+) -> None:
+    """Profile all pruned models.
+    
+    Args:
+        gpu: GPU device ID
+        prefix: Optional prefix to filter model paths
+        nvprof_args: Additional arguments for nvprof
+        count: Number of profiling runs per model
+        add: Whether to add new profiles to existing ones
+        structured: Whether to handle structured pruning profiles
+    """
     constructor = StructuredPruneModelManager if structured else PruneModelManager
     for vict_path in VictimModelManager.getModelPaths(prefix=prefix):
         prune_path = (
@@ -320,20 +481,23 @@ def loadProfilesToFolder(
     prefix: str = "models",
     folder_name: str = "victim_profiles",
     replace: bool = False,
-    filters: dict = None,
+    filters: Optional[Dict] = None,
     all: bool = True,
-):
-    """
-    For every victim model, loads all the profiles into cwd/prefix/name/
-    which is organized by model folder
-    folder_name: results will be stored to cwd/folder_name
+) -> None:
+    """Load model profiles into a centralized folder organized by model.
+
     Additionally creates a config json file where the keys are the paths to the profiles
     and the values are dicts of information about the profile such as path to actual profile,
     actual model architecture and architecture family, and model name.
-    filters: a dict and each argument in the dict must match
-        the argument from the config file associated with a profile.
-        to get a profile by name, can specify {"profile_number": "2181935"}
-    all: if true, loads all the profiles, else loads one per victim model
+    
+    Args:
+        prefix: Prefix for model paths
+        folder_name: Name of the folder to store profiles
+        replace: Whether to replace existing profiles
+        filters: Optional filters for profile selection, must match the argument from the 
+            config file associated with a profile.  To get a profile by name, can specify 
+            {"profile_number": "2181935"}.
+        all: Whether to load all profiles or one per model
     """
     config_name = "config.json"
     all_config = {}
@@ -345,7 +509,6 @@ def loadProfilesToFolder(
                 f"loadProfilesToFolder: folder already exists and replace is false, returning"
             )
             return
-            # raise FileExistsError
         shutil.rmtree(folder)
     folder.mkdir(exist_ok=True, parents=True)
 
@@ -371,7 +534,7 @@ def loadProfilesToFolder(
             all_config[str(new_name)] = config
             print(f"\tSaved Profile {profile_path.name} to {new_path}")
 
-    # save config file
+    # Save config file
     config_path = folder / config_name
     with open(config_path, "w") as f:
         json.dump(all_config, f, indent=4)
@@ -381,12 +544,19 @@ def loadPrunedProfilesToFolder(
     prefix: str = "models",
     folder_name: str = "victim_profiles_pruned",
     replace: bool = False,
-    filters: dict = None,
+    filters: Optional[Dict] = None,
     all: bool = True,
     structured: bool = False,
-):
-    """
-    Same as loadProfilesToFolder, but for pruned models
+) -> None:
+    """Same as loadProfilesToFolder, but for pruned models
+    
+    Args:
+        prefix: Prefix for model paths
+        folder_name: Name of the folder to store profiles
+        replace: Whether to replace existing profiles
+        filters: Optional filters for profile selection
+        all: Whether to load all profiles or one per model
+        structured: Whether to handle structured pruning profiles
     """
     config_name = "config.json"
     all_config = {}
@@ -398,7 +568,6 @@ def loadPrunedProfilesToFolder(
                 f"loadProfilesToFolder: folder already exists and replace is false, returning"
             )
             return
-            # raise FileExistsError
         shutil.rmtree(folder)
     folder.mkdir(exist_ok=True, parents=True)
 
@@ -430,7 +599,7 @@ def loadPrunedProfilesToFolder(
                 all_config[str(new_name)] = config
                 print(f"\tSaved Profile {profile_path.name} to {new_path}")
 
-    # save config file
+    # Save config file
     config_path = folder / config_name
     with open(config_path, "w") as f:
         json.dump(all_config, f, indent=4)
@@ -441,12 +610,25 @@ def predictVictimArchs(
     folder: Path,
     name: str = "predictions",
     save: bool = True,
-    topk=5,
+    topk: int = 5,
     verbose: bool = True,
-):
-    """Iterates through the profiles in <folder> which was generated
-    by loadProfilesToFolder(), the architecture of each, and storing
-    a report in a json file called <name>
+) -> Dict:
+    """Predict architectures from model profiles.
+
+    Iterates through the profiles in <folder> which was generated
+    by loadProfilesToFolder(), predicting the architecture of each, and storing
+    a report in a json file called <name>.
+    
+    Args:
+        model: Architecture prediction model
+        folder: Folder containing profiles
+        name: Name for the prediction results file
+        save: Whether to save predictions
+        topk: Number of top predictions to consider
+        verbose: Whether to print results
+        
+    Returns:
+        Dictionary containing prediction results and accuracy metrics
     """
     assert folder.exists()
 
@@ -513,13 +695,23 @@ def predictVictimArchs(
 
 
 def testKnockoffTrain(
-    model_arch="resnet18",
-    dataset="cifar100",
-    gpu=-1,
-    debug: int = None,
+    model_arch: str = "resnet18",
+    dataset: str = "cifar100",
+    gpu: int = -1,
+    debug: Optional[int] = None,
     num_epochs: int = 20,
     run_attack: bool = True,
-):
+) -> None:
+    """Test knockoff nets training with different configurations.
+    
+    Args:
+        model_arch: Architecture of the model to test
+        dataset: Dataset to use for training
+        gpu: GPU device ID (-1 for CPU)
+        debug: Debug level (None for no debugging)
+        num_epochs: Number of training epochs
+        run_attack: Whether to run attack evaluation
+    """
     vict_path = [
         x for x in VictimModelManager.getModelPaths() if str(x).find(model_arch) >= 0
     ][0]
@@ -549,7 +741,6 @@ def testKnockoffTrain(
         for sample_avg in [5, 10, 50]:
             for random_policy in [True, False]:
                 for entropy in [True, False]:
-                    # for pretrained in [True, False]:
                     try:
                         manager = SurrogateModelManager(
                             vict_path,
@@ -624,18 +815,36 @@ def trainKnockoffSurrogateModels(
     patience: List[int],
     lr: List[float],
     run_attack: bool,
-    gpu=0,
-    reverse=False,
-    debug=None,
+    gpu: int = 0,
+    reverse: bool = False,
+    debug: Optional[int] = None,
     save_model: bool = True,
-    model_paths: List[Path] = None,
-):
-    """
+    model_paths: Optional[List[Path]] = None,
+) -> None:
+    """Train knockoff surrogate models with specified configurations.
+
     Epochs, patience, and lr are lists of the same length
     specifying training in stages. the lr list is a factor
     times the default lr.  So if default is 0.1 and lr =
     [1, 0.5], then the lr will be 0.1*1 in the first stage
     and 0.1 * 0.5 in the second stage.
+    
+    Args:
+        dataset: Dataset to use for training
+        transfer_size: Size of transfer set
+        sample_avg: Number of samples to average
+        random_policy: Whether to use random knockoff nets policy
+        entropy: Whether to use entropy-based selection
+        pretrained: Whether to use pretrained models
+        epochs: List of epochs for each training stage
+        patience: List of patience values for each stage
+        lr: List of learning rate multipliers for each stage
+        run_attack: Whether to run attack evaluation
+        gpu: GPU device ID
+        reverse: Whether to process models in reverse order
+        debug: Debug level (None for no debugging)
+        save_model: Whether to save trained models
+        model_paths: List of victim model paths to use
     """
     if model_paths is None:
         model_paths = VictimModelManager.getModelPaths()
@@ -696,103 +905,3 @@ if __name__ == "__main__":
     )
     if not ans.lower() == "yes":
         exit(0)
-
-    # testKnockoffTrain(dataset="cifar100", gpu=-1, debug=1)
-    # testKnockoffTrain(dataset="cifar100", gpu=0)
-    # testKnockoffTrain(dataset="tiny-imagenet-200", gpu=1)
-    # model_paths = None
-    # model_paths = VictimModelManager.getModelPaths(architectures=[
-    #     'alexnet',
-    #     'resnext50_32x4d',
-    #     'resnext101_32x8d',
-    #     'wide_resnet50_2',
-    #     'wide_resnet101_2',
-    #     'vgg11',
-    #     'vgg11_bn',
-    #     'vgg13',
-    #     'vgg13_bn',
-    #     'vgg16',
-    #     'vgg16_bn',
-    #     'vgg19_bn',
-    #     'vgg19',
-    #     'squeezenet1_0',
-    #     'squeezenet1_1',
-    #     'densenet121',
-    #     'densenet169',
-    #     'densenet201',
-    #     'densenet161',
-    #     'googlenet',
-    #     'mobilenet_v2',
-    #     "mobilenet_v3_large",
-    #     "mobilenet_v3_small",
-    #     'mnasnet0_5',
-    #     'mnasnet0_75',
-    #     'mnasnet1_0',
-    #     'mnasnet1_3',
-    #     'shufflenet_v2_x0_5',
-    #     'shufflenet_v2_x1_0',
-    #     'shufflenet_v2_x1_5',
-    #     'shufflenet_v2_x2_0'
-    # ])
-    # trainKnockoffSurrogateModels(
-    #     dataset="cifar100",
-    #     transfer_size=40000,
-    #     sample_avg=50,
-    #     random_policy=False,
-    #     entropy=True,
-    #     pretrained=True,
-    #     epochs=[20, 20, 10],
-    #     patience=[7, 7, 3],
-    #     lr=[1, 0.1, 0.01],
-    #     run_attack=True,
-    #     gpu=0,
-    #     model_paths=model_paths,
-    # )
-    # trainSurrogateModels(
-    #     predict=False,
-    #     pretrained=True,
-    #     epochs=[20, 20, 10],
-    #     patience=[7, 7, 3],
-    #     lr=[1, 0.1, 0.01],
-    #     run_attack=True,
-    #     gpu=0,
-    #     model_paths=model_paths,
-    # )
-    # trainSurrogateModels(
-    #     predict=False,
-    #     pretrained=True,
-    #     epochs=[20, 20, 10],
-    #     patience=[7, 7, 3],
-    #     lr=[1, 0.1, 0.01],
-    #     run_attack=True,
-    #     gpu=0,
-    #     data_idx=0, # train on the same data as victim
-    # )
-
-    # ---------------------------------------
-    # Structured pruning workflow
-    # ---------------------------------------
-
-    # Step 1: generate structured pruned models
-    # pruneVictimModels(
-    #     finetune_epochs=0,
-    #     structured=True,
-    # )
-    deletePrunedProfiles(structured=True)
-
-    # Step 2: Profile predicted models
-    # profileAllPrunedModels(
-    #     gpu=0,
-    #     structured=True,
-    # )
-
-    # Step 3: Load Profiles to a folder
-    # loadPrunedProfilesToFolder(
-    #     folder_name= "victim_profiles_pruned_structured",
-    #     structured=True,
-    # )
-
-    # Step 4: Predict Architecture from Profiles, this is done through
-    # a separate function in plots/ which calls the predictVictimArchs function here
-
-    exit(0)

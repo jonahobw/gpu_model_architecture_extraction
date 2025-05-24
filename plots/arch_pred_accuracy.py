@@ -1,13 +1,32 @@
 """
-Generate a plot of architecture prediction accuracy with number of features on the x axis
-and on the y axis, accuracy of the model on the test and train set, with one line per model
+Generate plots analyzing architecture prediction accuracy based on feature selection.
+
+This module analyzes how the number of features affects the accuracy of architecture
+prediction models. It generates plots showing the relationship between the number of
+features used for training and the model's accuracy on training, validation, and test sets.
+
+The analysis includes:
+- Feature ranking and selection
+- Multiple experiments with different feature counts
+- Statistical analysis (mean and standard deviation) across experiments
+- Support for multiple model types and evaluation metrics
+- GPU kernel and memory operation filtering
+
+Example Usage:
+    ```python
+    # Generate feature ranking and accuracy analysis
+    df = getDF(path=folder, gpu_activities_only=True)
+    feature_rank = generateFeatureRank("rf", df)
+    report = generateReport(df, x_axis=range(1, 51), feature_rank=feature_rank)
+    plotFromReport(report, model_names=["rf", "lr"], datasets=["test"])
+    ```
 """
 
 import json
 import shutil
 import sys
 from pathlib import Path
-from typing import List, Union
+from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,31 +34,62 @@ import pandas as pd
 from matplotlib import rc
 from tqdm import tqdm
 
-# plt.style.use('ggplot')
-
-# setting path
+# Add parent directory to path for imports
 sys.path.append("../edge_profile")
 
-from architecture_prediction import (ArchPredBase, RFArchPred,
-                                     arch_model_names, get_arch_pred_model)
+from architecture_prediction import (
+    ArchPredBase,
+    RFArchPred,
+    arch_model_names,
+    get_arch_pred_model,
+)
 from config import SYSTEM_SIGNALS
-from data_engineering import (add_indicator_cols_to_input, all_data,
-                              filter_cols, get_data_and_labels, remove_cols,
-                              removeColumnsFromOther, shared_data)
+from data_engineering import (
+    add_indicator_cols_to_input,
+    all_data,
+    filter_cols,
+    get_data_and_labels,
+    remove_cols,
+    removeColumnsFromOther,
+    shared_data,
+)
 from experiments import predictVictimArchs
 from format_profiles import parse_one_profile
 from utils import latest_file
 
+# Configure matplotlib settings
 rc("font", **{"family": "serif", "serif": ["Times"], "size": 14})
 rc("figure", **{"figsize": (5, 4)})
 
 
 def getDF(
-    path: Path = None,
-    to_keep_path: Path = None,
-    save_path: Path = None,
-    gpu_activities_only=False,
-):
+    path: Optional[Path] = None,
+    to_keep_path: Optional[Path] = None,
+    save_path: Optional[Path] = None,
+    gpu_activities_only: bool = False,
+) -> pd.DataFrame:
+    """
+    Load and preprocess profiling data for architecture prediction.
+
+    Args:
+        path (Optional[Path]): Path to the profiling data directory.
+            Defaults to to_keep_path.
+        to_keep_path (Optional[Path]): Path to reference data for column filtering.
+            Defaults to quadro_rtx_8000/zero_exe_pretrained.
+        save_path (Optional[Path]): Path to save the processed DataFrame.
+            Defaults to None (no saving).
+        gpu_activities_only (bool): Whether to include only GPU activity data.
+            Defaults to False.
+
+    Returns:
+        pd.DataFrame: Processed DataFrame containing profiling data
+
+    The function:
+    1. Loads data from the specified path
+    2. Filters columns based on reference data
+    3. Optionally filters for GPU activities only
+    4. Optionally saves the processed data
+    """
     if to_keep_path is None:
         to_keep_path = (
             Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
@@ -53,31 +103,9 @@ def getDF(
     )
 
     keep_df = all_data(to_keep_path)
-    # remove cols of df if they aren't in keep_df
     df = removeColumnsFromOther(keep_df, df)
 
     exclude_cols = SYSTEM_SIGNALS
-    # exclude_cols.extend(["mem"])
-    # exclude_cols.extend(["avg_ms", "time_ms", "max_ms", "min_us"])
-    # exclude_cols.extend(["memcpy", "Malloc", "malloc", "memset"])#, "avg_us", "time_ms", "max_ms", "min_us", "indicator"])
-    # df = remove_cols(df, substrs=exclude_cols)
-    # df = filter_cols(df, substrs=["indicator"])
-    # df = filter_cols(df, substrs=["num_calls"])
-    # df = filter_cols(df, substrs=["num_calls", "indicator"])
-    # df = filter_cols(df, substrs=["num_calls", "time_percent", "indicator"])
-    # df = filter_cols(df, substrs=["gemm", "conv", "volta", "void", "indicator", "num_calls", "time_percent"])
-    # df = filter_cols(df, substrs=[
-    #     "indicator_void im2col4d_kernel<float, int>(",
-    #     "max_ms_void cudnn::detail::bn_fw_inf_1C11_ker",
-    #     "time_ms_void cudnn::detail::implicit_convolve_s",
-    #     "time_percent_void cudnn::detail::explicit_convolve",
-    #     # "avg_us_[CUDA memcpy HtoD]",
-    #     "indicator__ZN2at6native18elementwise_kernelILi128E",
-    #     "indicator_void at::native::_GLOBAL__N__60_tmpxft_00",
-    #     "num_calls_void at::native::vectorized_elementwise_k",
-    #     "avg_us_void cudnn::detail::explicit_convolve_sgemm<flo",
-    #     ]
-    # )
     print(f"Number of remaining dataframe columns: {len(df.columns)}")
     if save_path is not None:
         df.to_csv(save_path)
@@ -88,18 +116,41 @@ def generateReport(
     df: pd.DataFrame,
     x_axis: List[int],
     feature_rank: List[str],
-    model_names: List[str] = None,
-    model_kwargs: dict = {},
+    model_names: Optional[List[str]] = None,
+    model_kwargs: Dict[str, Dict] = {},
     num_experiments: int = 10,
-    save_report_name: str = None,
-):
+    save_report_name: Optional[str] = None,
+) -> Dict:
     """
-    For each model in model_names, and for each # of features in range(1, feature_cap, step_size),
-    trains the model with that number of features (using the top ranked features from feature_rank),
-    and gets the train, val, and test mean and std across num_experiments experiments.
+    Generate a report analyzing model accuracy across different feature counts.
+
+    For each model and feature count, performs multiple experiments to analyze
+    the relationship between number of features and model accuracy.
+
+    Args:
+        df (pd.DataFrame): Input dataset containing model profiles
+        x_axis (List[int]): List of feature counts to evaluate
+        feature_rank (List[str]): Ordered list of feature names by importance
+        model_names (Optional[List[str]]): List of model types to evaluate.
+            Defaults to all available models.
+        model_kwargs (Dict[str, Dict]): Additional arguments for each model.
+            Defaults to empty dict.
+        num_experiments (int): Number of experiments to run for each configuration.
+            Defaults to 10.
+        save_report_name (Optional[str]): Name for the output report file.
+            If None, report is not saved.
+
+    Returns:
+        Dict: Report containing accuracy metrics and experiment parameters
+
+    The report includes:
+    - Mean and standard deviation of accuracy for each model and feature count
+    - Training, validation, and test set performance
+    - Experiment configuration parameters
+    - Feature ranking information
     """
     if model_names is None:
-        model_names = arch_model_names()  # all the models we want to use
+        model_names = arch_model_names()
 
     report = {}
     for model_name in model_names:
@@ -112,9 +163,7 @@ def generateReport(
 
     try:
         for i, num_features in enumerate(x_axis):
-            print(
-                f"Running {num_experiments} experiments with {num_features} features."
-            )
+            print(f"Running {num_experiments} experiments with {num_features} features.")
             new_features = feature_rank[:num_features]
             new_df = filter_cols(df, substrs=new_features)
             for model_name in model_names:
@@ -132,7 +181,7 @@ def generateReport(
                         verbose=False,
                     )["accuracy_k"][1]
                     if model.deterministic:
-                        # only need to run one experiment, copy the result to the array
+                        # For deterministic models, only need one experiment
                         report[model_name]["train_acc"][i] = np.full(
                             (num_experiments), report[model_name]["train_acc"][i][exp]
                         )
@@ -144,34 +193,29 @@ def generateReport(
                         )
                         break
 
+        # Calculate statistics for each model
         for model_name in report:
-            report[model_name]["train_std"] = report[model_name]["train_acc"].std(
-                axis=1
-            )
-            report[model_name]["train_mean"] = report[model_name]["train_acc"].mean(
-                axis=1
-            )
+            report[model_name]["train_std"] = report[model_name]["train_acc"].std(axis=1)
+            report[model_name]["train_mean"] = report[model_name]["train_acc"].mean(axis=1)
             report[model_name]["val_std"] = report[model_name]["val_acc"].std(axis=1)
             report[model_name]["val_mean"] = report[model_name]["val_acc"].mean(axis=1)
             report[model_name]["test_std"] = report[model_name]["test_acc"].std(axis=1)
-            report[model_name]["test_mean"] = report[model_name]["test_acc"].mean(
-                axis=1
-            )
+            report[model_name]["test_mean"] = report[model_name]["test_acc"].mean(axis=1)
     except KeyboardInterrupt:
         pass
 
+    # Add metadata to report
     report["feature_rank"] = feature_rank
     report["df_cols"] = list(df.columns)
     report["num_experiments"] = num_experiments
     report["x_axis"] = x_axis
 
     if save_report_name is not None:
-
-        # make numpy arrays json serializable
+        # Make numpy arrays JSON serializable
         def json_handler(x):
             if isinstance(x, np.ndarray):
                 return x.tolist()
-            raise TypeError("Unserializable object {} of type {}".format(x, type(x)))
+            raise TypeError(f"Unserializable object {x} of type {type(x)}")
 
         if not save_report_name.endswith(".json"):
             save_report_name += ".json"
@@ -184,7 +228,24 @@ def generateReport(
     return report
 
 
-def loadReport(filename: str, feature_rank: bool = False):
+def loadReport(filename: str, feature_rank: bool = False) -> Dict:
+    """
+    Load a report from a JSON file.
+
+    Args:
+        filename (str): Name of the report file (with or without .json extension)
+        feature_rank (bool): If True, loads from feature_ranks directory.
+            Defaults to False.
+
+    Returns:
+        Dict: Loaded report data
+
+    Example:
+        ```python
+        report = loadReport("rf_gpu_kernels_nomem.json")
+        feature_rank = loadReport("feature_rank.json", feature_rank=True)
+        ```
+    """
     if not filename.endswith(".json"):
         filename += ".json"
 
@@ -196,14 +257,53 @@ def loadReport(filename: str, feature_rank: bool = False):
     return report
 
 
-def generateFeatureRank(arch_model_name: str, df: pd.DataFrame, kwargs: dict = {}):
+def generateFeatureRank(
+    arch_model_name: str, df: pd.DataFrame, kwargs: Dict = {}
+) -> List[str]:
+    """
+    Generate a ranking of features by importance using the specified model.
+
+    Args:
+        arch_model_name (str): Name of the model to use for feature ranking
+        df (pd.DataFrame): Input dataset containing model profiles
+        kwargs (Dict): Additional arguments for the model. Defaults to empty dict.
+
+    Returns:
+        List[str]: Ordered list of feature names by importance
+
+    Example:
+        ```python
+        feature_rank = generateFeatureRank("rf", df, kwargs={"rfe_num": 1})
+        ```
+    """
     kwargs.update({"rfe_num": 1})
     return get_arch_pred_model(
         arch_model_name, df=df, kwargs={"rfe_num": 1, "verbose": True}
     ).featureRank(suppress_output=True)
 
 
-def saveFeatureRank(feature_rank: List[str], metadata: dict = {}, save_name=None):
+def saveFeatureRank(
+    feature_rank: List[str], metadata: Dict = {}, save_name: Optional[str] = None
+) -> None:
+    """
+    Save feature ranking and metadata to a JSON file.
+
+    Args:
+        feature_rank (List[str]): Ordered list of feature names by importance
+        metadata (Dict): Additional metadata to save with the ranking.
+            Defaults to empty dict.
+        save_name (Optional[str]): Name for the output file.
+            Defaults to "feature_rank.json".
+
+    Example:
+        ```python
+        saveFeatureRank(
+            feature_rank=feature_rank,
+            metadata={"model": "rf", "gpu_only": True},
+            save_name="rf_gpu_features.json"
+        )
+        ```
+    """
     if save_name is None:
         save_name = "feature_rank.json"
     elif not save_name.endswith(".json"):
@@ -214,22 +314,41 @@ def saveFeatureRank(feature_rank: List[str], metadata: dict = {}, save_name=None
     feature_rank_folder.mkdir(exist_ok=True)
     save_path = feature_rank_folder / save_name
     with open(save_path, "w") as f:
-        report = json.dump(report, f, indent=4)
-    return
+        json.dump(report, f, indent=4)
 
 
 def plotFromReport(
-    report: dict,
+    report: Dict,
     model_names: List[str],
-    datasets: List[str] = None,
-    xlim_upper: int = None,
-    save_name: str = None,
+    datasets: Optional[List[str]] = None,
+    xlim_upper: Optional[int] = None,
+    save_name: Optional[str] = None,
     title: bool = True,
-):
+) -> None:
+    """
+    Generate plots from the accuracy report.
+
+    Args:
+        report (Dict): Report generated by generateReport
+        model_names (List[str]): List of model types to plot
+        datasets (Optional[List[str]]): List of datasets to plot ('train', 'val', 'test').
+            Defaults to ['val'].
+        xlim_upper (Optional[int]): Upper limit for x-axis. Defaults to None.
+        save_name (Optional[str]): Name for the output plot file.
+            Defaults to "arch_pred_acc.png".
+        title (bool): Whether to include plot title. Defaults to True.
+
+    The plot shows:
+    - Accuracy vs. number of features for each model and dataset
+    - Standard deviation bands around mean accuracy
+    - Clear labels and legend
+    - Configurable axis limits and title
+    """
     if save_name is None:
         save_name = "arch_pred_acc.png"
     if datasets is None:
         datasets = ["val"]
+
     x_axis = report["x_axis"]
     for model_name in model_names:
         for dataset in datasets:
@@ -250,17 +369,16 @@ def plotFromReport(
                 alpha=0.2,
             )
 
-    # plt.rcParams["figure.figsize"] = (3, 3)
     plt.tight_layout()
     plt.xlabel("Number of Features to Train Architecture Prediction Model")
 
     x_axis_lim = max(x_axis) if xlim_upper is None else xlim_upper
-
     interval = x_axis_lim // 10
     ticks = [x for x in range(0, x_axis_lim, interval)]
     ticks[0] = 1
     ticks.append(x_axis_lim)
     plt.xticks(ticks)
+
     dataset_name_map = {
         "val": "Validation",
         "train": "Train",
@@ -269,10 +387,11 @@ def plotFromReport(
     datasets_str = ""
     for ds in datasets:
         datasets_str += f"{dataset_name_map[ds]}/"
-    plt.ylabel(f"Architecture Prediction Accuracy")
+    plt.ylabel("Architecture Prediction Accuracy")
     if title:
         plt.title(
-            f"Architecture Prediction Accuracy on {datasets_str[:-1]} Data\nby Number of Features"
+            f"Architecture Prediction Accuracy on {datasets_str[:-1]} Data\n"
+            f"by Number of Features"
         )
     if xlim_upper is not None:
         plt.xlim(left=0, right=xlim_upper)
@@ -290,48 +409,38 @@ def plotFromReport(
 
 
 if __name__ == "__main__":
-
-    # ------------------------------------------------------------------------------
-
-    load_feature_rank = (
-        True  # if true, load features from file, if false, generate features and save
-    )
+    # Feature ranking configuration
+    load_feature_rank = True  # Load features from file or generate new ones
     features_model = "rf"
-
     features_model_kwargs = {}
     gpu_activities_only = True
     no_memory = True
     model_kwargs = {}
 
-    # features_filename = "combined_feature_rank_ab_lr_rf.json"
+    # Generate feature filename based on configuration
     features_filename = f"{features_model}"
     if gpu_activities_only:
-        features_filename += f"_gpu_kernels"
+        features_filename += "_gpu_kernels"
     if no_memory:
         features_filename += "_nomem"
 
     # ------------------------------------------------------------------------------
 
-    load_report = (
-        True  # if true, load report from file, if false, generate report and save
-    )
-
-    # parameters for generating a report, for loading a report, only the first variable
-    # needs to be set
-    # report_name = "combined_report"
+    # Report generation configuration
+    load_report = True  # Load existing report or generate new one
     report_name = features_filename
 
+    # Experiment configuration
     folder = Path.cwd() / "profiles" / "quadro_rtx_8000" / "zero_exe_pretrained"
-    model_names = arch_model_names()  # all the models we want to use
-    # model_names = ["lr", "knn", "centroid", "nb"]
+    model_names = arch_model_names()
     num_experiments = 10
     x_axis = [i for i in range(1, 51)]
     x_axis.extend([i for i in range(60, 200, 10)])
 
     # ------------------------------------------------------------------------------
 
-    # plotting
-    plot = True  # whether or not to plot
+    # Plotting configuration
+    plot = True
     plot_model_names = model_names
     plot_datasets = ["val"]  # ['val', 'train', 'test']
     xlim_upper = 30
@@ -344,8 +453,8 @@ if __name__ == "__main__":
     if no_memory:
         df = remove_cols(df, substrs=["mem"])
 
+    # Generate or load feature ranking
     if not load_feature_rank:
-        # generate feature rank and save
         feature_rank = generateFeatureRank(
             arch_model_name=features_model, df=df, kwargs=features_model_kwargs
         )
@@ -361,11 +470,10 @@ if __name__ == "__main__":
             save_name=features_filename,
         )
     else:
-        # load feature rank
         feature_rank = loadReport(features_filename, feature_rank=True)["feature_rank"]
 
+    # Generate or load report
     if not load_report:
-        # generate report and save
         report = generateReport(
             df=df,
             x_axis=x_axis,
@@ -376,9 +484,9 @@ if __name__ == "__main__":
             save_report_name=report_name,
         )
     else:
-        # load report
         report = loadReport(report_name)
 
+    # Generate plot if requested
     if plot:
         plotFromReport(
             report=report,

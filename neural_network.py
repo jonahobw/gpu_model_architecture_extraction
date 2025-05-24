@@ -1,9 +1,32 @@
 """
-Implements a fully connected N-layer neural network.
-Capability for training with decreasing learning rate.
-Used for predicting the model architecture from gpu profiles
+Implements a fully connected N-layer neural network for architecture prediction.
+
+This module provides a neural network implementation specifically designed for predicting
+model architectures from GPU profiles. It supports configurable network depth and width,
+with automatic learning rate adjustment during training.
+
+Example Usage:
+    ```python
+    # Create a 3-layer network with input size 100 and 10 output classes
+    net = Net(input_size=100, num_classes=10, hidden_layer_factor=0.5, layers=3)
+    
+    # Train the network
+    train_acc, test_acc, train_loss, test_loss = net.train_(
+        x_tr=train_data,
+        x_test=test_data,
+        y_tr=train_labels,
+        y_test=test_labels,
+        epochs=100,
+        lr=0.1
+    )
+    
+    # Make predictions
+    predictions = net.get_preds(new_data)
+    ```
 """
+
 import time
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -16,8 +39,44 @@ from torch import nn
 from model_metrics import correct
 
 
-class Net(torch.nn.Module):
-    def __init__(self, input_size, num_classes, hidden_layer_factor=None, layers=None):
+class Net(nn.Module):
+    """
+    A fully connected neural network for architecture prediction.
+
+    This network implements a configurable N-layer neural network with ReLU activations
+    and softmax output. It includes built-in data normalization and training capabilities
+    with learning rate scheduling.
+
+    Attributes:
+        layer_count (int): Number of layers in the network
+        device (torch.device): Device to run the network on (CPU/GPU)
+        scaler (Optional[StandardScaler]): Scaler for input normalization
+    """
+
+    def __init__(
+        self,
+        input_size: int,
+        num_classes: int,
+        hidden_layer_factor: Optional[float] = None,
+        layers: Optional[int] = None
+    ) -> None:
+        """
+        Initialize the neural network.
+
+        Args:
+            input_size (int): Size of input features
+            num_classes (int): Number of output classes
+            hidden_layer_factor (Optional[float]): Factor to determine hidden layer size.
+                Hidden layer size = input_size * hidden_layer_factor. Defaults to 0.5.
+            layers (Optional[int]): Number of layers in the network. Defaults to 3.
+
+        Note:
+            The network architecture is:
+            - Input layer: input_size neurons
+            - Hidden layers: hidden_layer_size neurons (input_size * hidden_layer_factor)
+            - Output layer: num_classes neurons
+            All layers except the last use ReLU activation.
+        """
         super().__init__()
         if hidden_layer_factor is None:
             hidden_layer_factor = 0.5
@@ -33,13 +92,26 @@ class Net(torch.nn.Module):
         self.y_test = None
         self.accuracy = None
         self.scaler = None
-        self.device = device = torch.device(
+        self.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu"
         )
 
     def construct_architecture(
-        self, input_size, hidden_layer_factor, num_classes, layers
-    ):
+        self,
+        input_size: int,
+        hidden_layer_factor: float,
+        num_classes: int,
+        layers: int
+    ) -> None:
+        """
+        Construct the network architecture.
+
+        Args:
+            input_size (int): Size of input features
+            hidden_layer_factor (float): Factor to determine hidden layer size
+            num_classes (int): Number of output classes
+            layers (int): Number of layers in the network
+        """
         layer_count = 0
         hidden_layer_size = int(input_size * hidden_layer_factor)
         for i in range(layers):
@@ -58,10 +130,28 @@ class Net(torch.nn.Module):
     def forward(self, x):
         for i in range(self.layer_count - 1):
             x = F.relu(self.get_layer(i)(x))
-        # return torch.sigmoid(self.get_layer(self.layer_count-1)(x))
         return self.get_layer(self.layer_count - 1)(x)
 
-    def get_preds(self, x, grad=False, normalize=True):
+    def get_preds(
+        self,
+        x: Union[np.ndarray, pd.DataFrame],
+        grad: bool = False,
+        normalize: bool = True
+    ) -> torch.Tensor:
+        """
+        Get predictions for input data.
+
+        Args:
+            x (Union[np.ndarray, pd.DataFrame]): Input data to predict
+            grad (bool): Whether to enable gradient computation. Defaults to False.
+            normalize (bool): Whether to normalize input data. Defaults to True.
+
+        Returns:
+            torch.Tensor: Softmax probabilities of shape (batch_size, num_classes)
+
+        Raises:
+            ValueError: If normalize=True but no scaler is set
+        """
         if normalize:
             x = self.normalize(x)
         x = torch.tensor(x, dtype=torch.float32)
@@ -71,15 +161,25 @@ class Net(torch.nn.Module):
         output = torch.nn.functional.softmax(output, dim=1)
         return torch.squeeze(output)
 
-    def normalize(self, x, fit=False):
+    def normalize(
+        self,
+        x: Union[np.ndarray, pd.DataFrame],
+        fit: bool = False
+    ) -> np.ndarray:
         """
-        Uses standard scaling (x-u)/s to scale the data.  If fit is true, sets the scaler object as
-        an instance variable so that future data can be scaled with the same mean and std.
+        Normalize input data using standard scaling (x-u)/s.
 
-        :param x: the data to normalize
-        :param fit: whether or not to fit the scaler with this data's mean and std.  Should be true for
-                the training data and false for the test data.
-        :return: normalized data
+        Args:
+            x (Union[np.ndarray, pd.DataFrame]): Data to normalize
+            fit (bool): Whether to fit the scaler with this data's statistics.
+                Should be True for training data and False for test data.
+                Defaults to False.
+
+        Returns:
+            np.ndarray: Normalized data
+
+        Raises:
+            ValueError: If fit=False but no scaler is set
         """
         if isinstance(x, pd.DataFrame):
             x = x.to_numpy()
@@ -88,25 +188,50 @@ class Net(torch.nn.Module):
         x = torch.from_numpy(x)
 
         if fit:
-            # set the scaler
             self.scaler = StandardScaler()
             return self.scaler.fit_transform(x)
 
-        # fit is false
         if not self.scaler:
             raise ValueError(
-                "calling normalize with fit = False when there is no scaler set."
+                "Calling normalize with fit=False when there is no scaler set."
             )
 
         return self.scaler.transform(x)
 
-    def train_(self, x_tr, x_test, y_tr, y_test, epochs=100, lr=0.1, verbose=True):
-        # format data
-        # X_train = torch.from_numpy(x_tr.to_numpy()).float()
-        # y_train = torch.squeeze(torch.from_numpy(y_tr.to_numpy()).float())
-        # X_test = torch.from_numpy(x_test.to_numpy()).float()
-        # y_test = torch.squeeze(torch.from_numpy(y_test.to_numpy()).float())
+    def train_(
+        self,
+        x_tr: Union[np.ndarray, pd.DataFrame],
+        x_test: Union[np.ndarray, pd.DataFrame],
+        y_tr: Union[np.ndarray, pd.DataFrame],
+        y_test: Union[np.ndarray, pd.DataFrame],
+        epochs: int = 100,
+        lr: float = 0.1,
+        verbose: bool = True
+    ) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]], List[float], List[float]]:
+        """
+        Train the network.
 
+        Args:
+            x_tr (Union[np.ndarray, pd.DataFrame]): Training features
+            x_test (Union[np.ndarray, pd.DataFrame]): Test features
+            y_tr (Union[np.ndarray, pd.DataFrame]): Training labels
+            y_test (Union[np.ndarray, pd.DataFrame]): Test labels
+            epochs (int): Number of training epochs. Defaults to 100.
+            lr (float): Initial learning rate. Defaults to 0.1.
+            verbose (bool): Whether to print training progress. Defaults to True.
+
+        Returns:
+            Tuple[List[Tuple[float, float]], List[Tuple[float, float]], List[float], List[float]]:
+                Tuple containing:
+                - Training accuracy history (top-1, top-3)
+                - Test accuracy history (top-1, top-3)
+                - Training loss history
+                - Test loss history
+
+        Note:
+            Uses SGD optimizer with momentum and learning rate scheduling.
+            Learning rate is reduced when training loss plateaus.
+        """
         x_tr = torch.tensor(x_tr, dtype=torch.float32)
         x_test = torch.tensor(x_test, dtype=torch.float32)
         y_tr = torch.tensor(y_tr, dtype=torch.long)
@@ -123,7 +248,6 @@ class Net(torch.nn.Module):
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, patience=5, cooldown=3
         )
-        # optimizer = optim.Adam(model.parameters(), lr=lr)
 
         x_tr = x_tr.to(self.device)
         y_tr = y_tr.to(self.device)
@@ -133,8 +257,6 @@ class Net(torch.nn.Module):
         criterion = criterion.to(self.device)
 
         for epoch in range(epochs):
-            # if (epoch % 25 == 0 and epoch != 0):
-            #     lr = lr / 10
             with torch.set_grad_enabled(True):
                 y_pred = self(x_tr)
                 y_pred = torch.squeeze(y_pred)
@@ -182,11 +304,6 @@ class Net(torch.nn.Module):
                 )
             )
 
-        # self.x_tr = x_tr
-        # self.x_test = x_test
-        # self.y_tr = y_tr
-        # self.y_test = y_test
-
         return (
             training_acc_history,
             test_acc_history,
@@ -194,7 +311,23 @@ class Net(torch.nn.Module):
             test_loss_history,
         )
 
-    def train_test_accuracy(self):
+    def train_test_accuracy(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        """
+        Compute accuracy on training and test sets.
+
+        Returns:
+            Tuple[Tuple[float, float], Tuple[float, float]]: Tuple containing:
+                - Training accuracy (top-1, top-3)
+                - Test accuracy (top-1, top-3)
+
+        Raises:
+            ValueError: If training or test data is not set
+        """
+        if self.x_tr is None or self.y_tr is None:
+            raise ValueError("Training data not set")
+        if self.x_test is None or self.y_test is None:
+            raise ValueError("Test data not set")
+
         y_tr_pred = self.get_preds(self.x_tr)
         train_acc = correct(y_tr_pred, self.y_tr)
         y_test_pred = self.get_preds(self.y_test)
