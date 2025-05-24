@@ -16,7 +16,6 @@ Dependencies:
 Usage: python download_dataset.py -name <dataset_name>
 """
 
-import io
 import shutil
 import zipfile
 from argparse import ArgumentParser
@@ -38,7 +37,9 @@ torchvision_datasets: Dict[str, Type[ImageFolder]] = {
 }
 
 # List of all supported datasets
-supported_datasets: List[str] = ["tiny-imagenet-200"] + list(torchvision_datasets.keys())
+supported_datasets: List[str] = ["tiny-imagenet-200"] + list(
+    torchvision_datasets.keys()
+)
 
 # Default download path
 download_path: Path = Path.cwd() / "datasets"
@@ -48,17 +49,19 @@ if not download_path.exists():
     download_path.mkdir(parents=True, exist_ok=True)
 
 
-def download(url: str, fname: Union[str, Path], chunk_size: int = 1024) -> requests.Response:
+def download(
+    url: str, fname: Union[str, Path], chunk_size: int = 1024
+) -> requests.Response:
     """Download a file from a URL with progress tracking.
-    
+
     Args:
         url: URL to download from
         fname: Path to save the file to
         chunk_size: Size of chunks to download at a time
-        
+
     Returns:
         Response object from the download request
-        
+
     Raises:
         AssertionError: If download fails (status code != 200)
     """
@@ -84,14 +87,14 @@ def download(url: str, fname: Union[str, Path], chunk_size: int = 1024) -> reque
 
 def downloadDataset(dataset_name: str) -> None:
     """Download and prepare a dataset.
-    
+
     This function handles both torchvision datasets and custom datasets like TinyImageNet-200.
     For torchvision datasets, it uses the built-in download functionality.
     For TinyImageNet-200, it downloads the zip file and formats the directory structure.
-    
+
     Args:
         dataset_name: Name of the dataset to download
-        
+
     Raises:
         ValueError: If dataset_name is not in supported_datasets
     """
@@ -101,11 +104,11 @@ def downloadDataset(dataset_name: str) -> None:
         )
     dataset_path = download_path / dataset_name
     print(f"Downloading {dataset_name} ...")
-    
+
     # Handle torchvision datasets
     if dataset_name in torchvision_datasets:
         torchvision_datasets[dataset_name](root=dataset_path, download=True)
-    
+
     # Handle TinyImageNet-200 dataset
     if dataset_name == "tiny-imagenet-200":
         file = download_path / "tiny-imagenet-200.zip"

@@ -26,7 +26,7 @@ Example Usage:
 """
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple, Optional, Union, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -38,21 +38,23 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import (LabelEncoder, MinMaxScaler, StandardScaler)
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 
-from config import SYSTEM_SIGNALS
-from data_engineering import (add_indicator_cols_to_input, all_data,
-                              get_data_and_labels, remove_cols, shared_data,
-                              softmax)
+from data_engineering import (
+    add_indicator_cols_to_input,
+    all_data,
+    get_data_and_labels,
+    softmax,
+)
 from neural_network import Net
 
 
 class ArchPredBase(ABC):
     """Base class for architecture prediction models.
-    
+
     This abstract base class defines the interface and common functionality
     for all architecture prediction models.
-    
+
     Args:
         df: Input DataFrame containing profile data
         name: Name of the model
@@ -62,7 +64,7 @@ class ArchPredBase(ABC):
         train_size: Size of training set (optional)
         test_size: Size of test set (optional)
     """
-    
+
     def __init__(
         self,
         df: pd.DataFrame,
@@ -104,11 +106,11 @@ class ArchPredBase(ABC):
 
     def preprocessInput(self, x: pd.Series, expand: bool = True) -> np.ndarray:
         """Preprocess input data for prediction.
-        
+
         Args:
             x: Input data series
             expand: Whether to expand dimensions for batch processing
-            
+
         Returns:
             Preprocessed numpy array
         """
@@ -123,11 +125,11 @@ class ArchPredBase(ABC):
     @abstractmethod
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores for each class.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -136,11 +138,11 @@ class ArchPredBase(ABC):
     @abstractmethod
     def predict(self, x: pd.Series, preprocess: bool = True) -> Tuple[str, float]:
         """Make a prediction for the input data.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Tuple of (predicted class, confidence score)
         """
@@ -148,12 +150,12 @@ class ArchPredBase(ABC):
 
     def topK(self, x: pd.Series, k: int = 3, preprocess: bool = True) -> List[str]:
         """Get top K predictions for the input data.
-        
+
         Args:
             x: Input data series
             k: Number of top predictions to return
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             List of top K predicted classes, ordered by confidence
         """
@@ -166,12 +168,12 @@ class ArchPredBase(ABC):
         self, x: pd.Series, k: int = 3, preprocess: bool = True
     ) -> List[Tuple[str, float]]:
         """Get top K predictions with confidence scores.
-        
+
         Args:
             x: Input data series
             k: Number of top predictions to return
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             List of (class, confidence) tuples, ordered by confidence
         """
@@ -195,7 +197,7 @@ class ArchPredBase(ABC):
 
     def evaluateTrain(self) -> float:
         """Evaluate model performance on training data.
-        
+
         Returns:
             Training accuracy score
         """
@@ -205,7 +207,7 @@ class ArchPredBase(ABC):
 
     def evaluateTest(self) -> float:
         """Evaluate model performance on test data.
-        
+
         Returns:
             Test accuracy score
         """
@@ -217,12 +219,12 @@ class ArchPredBase(ABC):
         self, data: pd.DataFrame, y_label: str = "model", preprocess: bool = True
     ) -> float:
         """Evaluate model performance on custom data.
-        
+
         Args:
             data: Input DataFrame
             y_label: Column name for target variable
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Accuracy score
         """
@@ -238,7 +240,7 @@ class ArchPredBase(ABC):
 
 class RFEArchPred(ArchPredBase):
     """Base class for models using Recursive Feature Elimination (RFE).
-    
+
     This class extends ArchPredBase to add RFE-specific functionality for
     feature selection and ranking.
     """
@@ -253,16 +255,15 @@ class RFEArchPred(ArchPredBase):
             if support[i]:
                 print(f"Feature {i}:\t{col_name[:80]}")
 
-
     def featureRank(
         self, save_path: Optional[Path] = None, suppress_output: bool = False
     ) -> List[str]:
         """Get ranking of features based on RFE.
-        
+
         Args:
             save_path: Optional path to save feature ranking
             suppress_output: Whether to suppress console output
-            
+
         Returns:
             List of feature names ordered by their ranking
         """
@@ -307,11 +308,11 @@ class SKLearnClassifier(ArchPredBase):
 
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores using scikit-learn's decision function.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -320,14 +321,13 @@ class SKLearnClassifier(ArchPredBase):
         preds = self.model.decision_function(x)[0]
         return softmax(preds)
 
-
     def predict(self, x: pd.Series, preprocess: bool = True) -> Tuple[str, float]:
         """Make a prediction using the scikit-learn model.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Tuple of (predicted class, confidence score)
         """
@@ -340,10 +340,10 @@ class SKLearnClassifier(ArchPredBase):
 
 class NNArchPred(ArchPredBase):
     """Neural network based architecture prediction model.
-    
+
     This class implements a PyTorch-based neural network for architecture prediction.
     """
-    
+
     NAME = "nn_old"
     FULL_NAME = "Neural Network (PyTorch)"
 
@@ -360,7 +360,7 @@ class NNArchPred(ArchPredBase):
         test_size: Optional[float] = None,
     ):
         """Initialize neural network model.
-        
+
         Args:
             df: Input DataFrame
             label: Target variable column name
@@ -404,14 +404,13 @@ class NNArchPred(ArchPredBase):
         )
         self.model.eval()
 
-
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores from neural network.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -420,14 +419,13 @@ class NNArchPred(ArchPredBase):
         preds = self.model.get_preds(x)
         return preds.cpu().numpy()
 
-
     def predict(self, x: pd.Series, preprocess: bool = True) -> Tuple[str, float]:
         """Make a prediction using the neural network.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Tuple of (predicted class, confidence score)
         """
@@ -437,10 +435,9 @@ class NNArchPred(ArchPredBase):
         label = self.label_encoder.inverse_transform(np.array([pred]))
         return label[0], conf.item()
 
-
     def evaluateTrain(self) -> float:
         """Evaluate neural network on training data.
-        
+
         Returns:
             Training accuracy score
         """
@@ -452,10 +449,9 @@ class NNArchPred(ArchPredBase):
         print(f"X_train acc1: {correct1 / len(self.y_train)}")
         return correct1 / len(self.y_train)
 
-
     def evaluateTest(self) -> float:
         """Evaluate neural network on test data.
-        
+
         Returns:
             Test accuracy score
         """
@@ -470,11 +466,11 @@ class NNArchPred(ArchPredBase):
 
 class NN2LRArchPred(SKLearnClassifier):
     """Neural network implemented using scikit-learn's MLPClassifier.
-    
+
     This class provides a neural network implementation using scikit-learn's
     MLPClassifier instead of PyTorch.
     """
-    
+
     NAME = "nn"
     FULL_NAME = "Neural Network"
 
@@ -492,7 +488,7 @@ class NN2LRArchPred(SKLearnClassifier):
         test_size: Optional[float] = None,
     ):
         """Initialize scikit-learn neural network model.
-        
+
         Args:
             df: Input DataFrame
             label: Target variable column name
@@ -532,14 +528,13 @@ class NN2LRArchPred(SKLearnClassifier):
         if self.verbose:
             self.evaluateTest()
 
-
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores from scikit-learn neural network.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -550,7 +545,7 @@ class NN2LRArchPred(SKLearnClassifier):
 
 class LRArchPred(RFEArchPred, SKLearnClassifier):
     """Logistic Regression based architecture prediction model."""
-    
+
     NAME = "lr"
     FULL_NAME = "Logistic Regression"
 
@@ -567,7 +562,7 @@ class LRArchPred(RFEArchPred, SKLearnClassifier):
         test_size: Optional[float] = None,
     ) -> None:
         """Initialize logistic regression model.
-        
+
         Args:
             df: Input DataFrame
             label: Target variable column name
@@ -612,7 +607,7 @@ class LRArchPred(RFEArchPred, SKLearnClassifier):
 
 class RFArchPred(RFEArchPred, SKLearnClassifier):
     """Random Forest based architecture prediction model."""
-    
+
     NAME = "rf"
     FULL_NAME = "Random Forest"
 
@@ -628,7 +623,7 @@ class RFArchPred(RFEArchPred, SKLearnClassifier):
         test_size: Optional[float] = None,
     ) -> None:
         """Initialize random forest model.
-        
+
         Args:
             df: Input DataFrame
             label: Target variable column name
@@ -669,14 +664,13 @@ class RFArchPred(RFEArchPred, SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores from random forest.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -688,7 +682,7 @@ class RFArchPred(RFEArchPred, SKLearnClassifier):
 
 class KNNArchPred(SKLearnClassifier):
     """K-Nearest Neighbors based architecture prediction model."""
-    
+
     NAME = "knn"
     FULL_NAME = "K Nearest Neighbors"
 
@@ -704,7 +698,7 @@ class KNNArchPred(SKLearnClassifier):
         test_size: Optional[float] = None,
     ) -> None:
         """Initialize KNN model.
-        
+
         Args:
             df: Input DataFrame
             label: Target variable column name
@@ -734,14 +728,13 @@ class KNNArchPred(SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores from KNN.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -752,7 +745,7 @@ class KNNArchPred(SKLearnClassifier):
 
 class CentroidArchPred(SKLearnClassifier):
     """Nearest Centroid based architecture prediction model."""
-    
+
     NAME = "centroid"
     FULL_NAME = "Nearest Centroid"
 
@@ -766,7 +759,7 @@ class CentroidArchPred(SKLearnClassifier):
         test_size: Optional[float] = None,
     ) -> None:
         """Initialize nearest centroid model.
-        
+
         Args:
             df: Input DataFrame
             label: Target variable column name
@@ -792,14 +785,13 @@ class CentroidArchPred(SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores from nearest centroid.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -813,7 +805,7 @@ class CentroidArchPred(SKLearnClassifier):
 
 class NBArchPred(SKLearnClassifier):
     """Naive Bayes based architecture prediction model."""
-    
+
     NAME = "nb"
     FULL_NAME = "Naive Bayes"
 
@@ -827,7 +819,7 @@ class NBArchPred(SKLearnClassifier):
         test_size: Optional[float] = None,
     ) -> None:
         """Initialize naive bayes model.
-        
+
         Args:
             df: Input DataFrame
             label: Target variable column name
@@ -853,14 +845,13 @@ class NBArchPred(SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores from naive bayes.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -871,7 +862,7 @@ class NBArchPred(SKLearnClassifier):
 
 class ABArchPred(RFEArchPred, SKLearnClassifier):
     """AdaBoost based architecture prediction model."""
-    
+
     NAME = "ab"
     FULL_NAME = "AdaBoost"
 
@@ -887,7 +878,7 @@ class ABArchPred(RFEArchPred, SKLearnClassifier):
         test_size: Optional[float] = None,
     ) -> None:
         """Initialize AdaBoost model.
-        
+
         Args:
             df: Input DataFrame
             label: Target variable column name
@@ -928,14 +919,13 @@ class ABArchPred(RFEArchPred, SKLearnClassifier):
             self.printFeatures()
             self.evaluateTest()
 
-
     def getConfidenceScores(self, x: pd.Series, preprocess: bool = True) -> np.ndarray:
         """Get confidence scores from AdaBoost.
-        
+
         Args:
             x: Input data series
             preprocess: Whether to preprocess the input
-            
+
         Returns:
             Array of confidence scores for each class
         """
@@ -946,16 +936,19 @@ class ABArchPred(RFEArchPred, SKLearnClassifier):
 
 
 def get_arch_pred_model(
-    model_type: str, df: Optional[pd.DataFrame] = None, label: Optional[str] = None, kwargs: Dict[str, Any] = {}
+    model_type: str,
+    df: Optional[pd.DataFrame] = None,
+    label: Optional[str] = None,
+    kwargs: Dict[str, Any] = {},
 ) -> ArchPredBase:
     """Get an architecture prediction model instance.
-    
+
     Args:
         model_type: Type of model to create
         df: Input DataFrame
         label: Target variable column name
         kwargs: Additional keyword arguments for model initialization
-        
+
     Returns:
         Instance of requested model type
     """
@@ -977,7 +970,7 @@ def get_arch_pred_model(
 
 def arch_model_names() -> List[str]:
     """Get list of available model names.
-    
+
     Returns:
         List of model name strings
     """
@@ -994,7 +987,7 @@ def arch_model_names() -> List[str]:
 
 def arch_model_full_name() -> Dict[str, str]:
     """Get mapping of model names to their full names.
-    
+
     Returns:
         Dictionary mapping model names to their full names
     """

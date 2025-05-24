@@ -67,7 +67,7 @@ Training metrics:
 
 import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -88,7 +88,6 @@ from model_manager import (
     SurrogateModelManager,
     VictimModelManager,
     getModelsFromSurrogateTrainStrategies,
-    getVictimSurrogateModels,
 )
 
 # Constants
@@ -480,7 +479,7 @@ def plotSingleMetricByModel(
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     families = [x[0] for x in model_families]
     family_to_color = {families[i]: colors[i] for i in range(len(families))}
-    
+
     for model in models:
         if label_family:
             plt.plot(
@@ -571,7 +570,7 @@ if __name__ == "__main__":
     # plotOneMetricPerModel(strategies=strategies, models=models, metric="val_acc1", save=False, include_victim=True)
     # plotOneMetricPerModel(strategies=strategies, models=models, metric="val_loss", save=False, include_victim=True, y_lim=(0.001, 0.075))
     # plotOneMetricPerModel(strategies=strategies, models=models, metric="l1_weight_bound", save=False, normalize=True)
-    
+
     plotOneMetricPerModel(
         strategies=strategies,
         models=models,

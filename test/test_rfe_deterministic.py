@@ -21,9 +21,14 @@ sys.path.append("../edge_profile")
 
 from architecture_prediction import ArchPredBase, get_arch_pred_model
 from config import SYSTEM_SIGNALS
-from data_engineering import (add_indicator_cols_to_input, all_data,
-                              filter_cols, get_data_and_labels, remove_cols,
-                              shared_data)
+from data_engineering import (
+    add_indicator_cols_to_input,
+    all_data,
+    filter_cols,
+    get_data_and_labels,
+    remove_cols,
+    shared_data,
+)
 from experiments import predictVictimArchs
 from format_profiles import parse_one_profile
 from utils import latest_file

@@ -29,22 +29,18 @@ Example Usage:
 
 import datetime
 import json
-import shutil
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from matplotlib import rc
-from tqdm import tqdm
 
 # Add parent directory to path for imports
 sys.path.append("../edge_profile")
 
 from model_manager import VictimModelManager
-from utils import checkDict
 
 # Configure matplotlib settings
 rc("font", **{"family": "serif", "serif": ["Times"], "size": 14})
@@ -84,7 +80,7 @@ def plotClassImportance(
     """
     knockoff_names = list(knockoff_params.keys())
     knockoff_dataset = knockoff_params[knockoff_names[0]]["dataset_name"]
-    
+
     # Validate that all knockoff sets use the same dataset
     for params in knockoff_params:
         assert knockoff_params[params]["dataset_name"] == knockoff_dataset

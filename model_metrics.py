@@ -18,20 +18,17 @@ Example Usage:
 """
 
 import random
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
-from torch.backends import cudnn
 from torch.nn.modules.loss import _Loss
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
 def correct(
-    output: torch.Tensor,
-    target: torch.Tensor,
-    topk: Tuple[int, ...] = (1,)
+    output: torch.Tensor, target: torch.Tensor, topk: Tuple[int, ...] = (1,)
 ) -> List[int]:
     """
     Compute the number of correct predictions for each top-k value.
@@ -78,7 +75,7 @@ def both_correct(
     output1: torch.Tensor,
     output2: torch.Tensor,
     target: torch.Tensor,
-    topk: Tuple[int, ...] = (1,)
+    topk: Tuple[int, ...] = (1,),
 ) -> List[int]:
     """
     Compute the number of predictions that both models get correct.
@@ -136,7 +133,7 @@ def accuracy(
     topk: Tuple[int, ...] = (1,),
     seed: Optional[int] = None,
     loss_func: Optional[_Loss] = None,
-    debug: Optional[int] = None
+    debug: Optional[int] = None,
 ) -> np.ndarray:
     """
     Compute model accuracy and loss over a dataset.

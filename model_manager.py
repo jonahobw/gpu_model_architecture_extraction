@@ -55,7 +55,6 @@ import datetime
 import json
 import random
 import shutil
-import sys
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -67,16 +66,15 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    TypeVar,
-    Generic,
 )
 
 import numpy as np
 import pandas as pd
 import torch
-from cleverhans.torch.attacks.projected_gradient_descent import projected_gradient_descent
+from cleverhans.torch.attacks.projected_gradient_descent import (
+    projected_gradient_descent,
+)
 from torch.nn.utils import prune
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from architecture_prediction import ArchPredBase
@@ -96,9 +94,7 @@ from utils import checkDict, latest_file, latestFileFromList
 
 
 def loadModel(
-    path: Path,
-    model: torch.nn.Module,
-    device: Optional[torch.device] = None
+    path: Path, model: torch.nn.Module, device: Optional[torch.device] = None
 ) -> None:
     """
     Load model parameters from a saved checkpoint.
@@ -219,7 +215,7 @@ class ModelManagerBase(ABC):
         self,
         pretrained: bool = False,
         quantized: bool = False,
-        kwargs: Optional[Dict[str, Any]] = None
+        kwargs: Optional[Dict[str, Any]] = None,
     ) -> torch.nn.Module:
         """
         Construct a new model instance.
@@ -265,7 +261,7 @@ class ModelManagerBase(ABC):
         self,
         name: Optional[str] = None,
         epoch: Optional[int] = None,
-        replace: bool = False
+        replace: bool = False,
     ) -> None:
         """
         Save model parameters to a checkpoint file.
@@ -314,7 +310,7 @@ class ModelManagerBase(ABC):
 
     @staticmethod
     @abstractmethod
-    def load(path: Path, gpu: int = -1) -> 'ModelManagerBase':
+    def load(path: Path, gpu: int = -1) -> "ModelManagerBase":
         """
         Load a model manager from a saved checkpoint.
 
@@ -695,9 +691,7 @@ class ModelManagerBase(ABC):
         )
 
     def topKAcc(
-        self,
-        dataloader: torch.utils.data.DataLoader,
-        topk: Tuple[int, ...] = (1, 5)
+        self, dataloader: torch.utils.data.DataLoader, topk: Tuple[int, ...] = (1, 5)
     ) -> None:
         """
         Calculate top-k accuracy on a dataset.
@@ -728,7 +722,7 @@ class ModelManagerBase(ABC):
 
         print({k: online_stats[k].mean for k in online_stats})
 
-    def getL1WeightNorm(self, other: 'ModelManagerBase') -> float:
+    def getL1WeightNorm(self, other: "ModelManagerBase") -> float:
         """
         Calculate L1 norm of weight differences between two models.
 
@@ -770,11 +764,7 @@ class ProfiledModelManager(ModelManagerBase):
     """
 
     def runNVProf(
-        self, 
-        use_exe: bool = True, 
-        seed: int = 47, 
-        n: int = 10, 
-        input: str = "0"
+        self, use_exe: bool = True, seed: int = 47, n: int = 10, input: str = "0"
     ) -> None:
         """
         Run NVIDIA profiler on the model and save the results.
@@ -846,7 +836,7 @@ class ProfiledModelManager(ModelManagerBase):
         Check if the model has been profiled.
 
         Returns:
-            bool: True if there is a subfolder self.path/profiles with at least one 
+            bool: True if there is a subfolder self.path/profiles with at least one
                   profile_{pid}.csv and associated params_{pid}.json file.
         """
         profile_folder = self.path / "profiles"
@@ -861,14 +851,16 @@ class ProfiledModelManager(ModelManagerBase):
         profile_path = self.path / "profiles" / Path(conf["file"]).name
         return profile_path.exists()
 
-    def getProfile(self, filters: Optional[Dict[str, Any]] = None) -> Tuple[Path, Dict[str, Any]]:
+    def getProfile(
+        self, filters: Optional[Dict[str, Any]] = None
+    ) -> Tuple[Path, Dict[str, Any]]:
         """
         Get a specific profile based on filter criteria.
 
         Args:
             filters (Optional[Dict[str, Any]]): Dictionary of filter criteria. Each argument
                 must match the argument from the config file associated with a profile.
-                To get a profile by name, specify {"profile_number": "2181935"}.  If there 
+                To get a profile by name, specify {"profile_number": "2181935"}.  If there
                 are multiple profiles which fit the filters, return the latest one.
 
         Returns:
@@ -911,7 +903,9 @@ class ProfiledModelManager(ModelManagerBase):
         conf = fit_filters[latest_valid_path]
         return latest_valid_path, conf
 
-    def getAllProfiles(self, filters: Optional[Dict[str, Any]] = None) -> List[Tuple[Path, Dict[str, Any]]]:
+    def getAllProfiles(
+        self, filters: Optional[Dict[str, Any]] = None
+    ) -> List[Tuple[Path, Dict[str, Any]]]:
         """
         Get all profiles matching filter criteria.
 
@@ -946,10 +940,10 @@ class ProfiledModelManager(ModelManagerBase):
         return result
 
     def predictVictimArch(
-        self, 
-        arch_pred_model: ArchPredBase, 
-        average: bool = False, 
-        filters: Optional[Dict[str, Any]] = None
+        self,
+        arch_pred_model: ArchPredBase,
+        average: bool = False,
+        filters: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, float, ArchPredBase]:
         """
         Predict the architecture of the victim model using a trained architecture prediction model.
@@ -1102,7 +1096,7 @@ class VictimModelManager(ProfiledModelManager):
         self.saveConfig()
 
     @staticmethod
-    def load(model_path: Path, gpu: int = -1) -> 'VictimModelManager':
+    def load(model_path: Path, gpu: int = -1) -> "VictimModelManager":
         """
         Create a VictimModelManager from a saved model checkpoint.
 
@@ -1130,7 +1124,9 @@ class VictimModelManager(ProfiledModelManager):
         model_manager.config = conf
         return model_manager
 
-    def generateFolder(self, load: Optional[Path], architecture: str, model_name: str) -> Path:
+    def generateFolder(
+        self, load: Optional[Path], architecture: str, model_name: str
+    ) -> Path:
         """
         Generate the model folder path.
 
@@ -1150,8 +1146,7 @@ class VictimModelManager(ProfiledModelManager):
 
     @staticmethod
     def getModelPaths(
-        prefix: Optional[str] = None,
-        architectures: Optional[List[str]] = None
+        prefix: Optional[str] = None, architectures: Optional[List[str]] = None
     ) -> List[Path]:
         """
         Get paths to all victim models in a directory.
@@ -1247,11 +1242,11 @@ class VictimModelManager(ProfiledModelManager):
             dataset_name (str): Name of dataset to generate transfer set from (should
             not be the dataset on which the victim model was trained)
             transfer_size (int): Size of transfer set to generate
-            sample_avg (int): Number of samples per class for entropy estimation, 
+            sample_avg (int): Number of samples per class for entropy estimation,
             higher number means better entropy estimation.  Only used if random_policy=0
             random_policy (bool): If True, use random sampling strategy
             entropy (bool): If True, use entropy for adaptive sampling, else use confidence
-        
+
         Raises:
             AssertionError: If dataset is same as victim training dataset
             AssertionError: If transfer size exceeds dataset size
@@ -1481,7 +1476,7 @@ class VictimModelManager(ProfiledModelManager):
             random_policy (bool): Whether random sampling was used
             entropy (bool): Whether entropy was used for sampling
             force (bool): If True, generate new transfer set if none exists
-        
+
         Returns:
             Tuple[Path, Dataset]: Tuple containing:
                 - Path to transfer set JSON file
@@ -1671,7 +1666,7 @@ class QuantizedModelManager(ProfiledModelManager):
         self.loadModel(path)
 
     @staticmethod
-    def load(model_path: Path, gpu: int = -1) -> 'QuantizedModelManager':
+    def load(model_path: Path, gpu: int = -1) -> "QuantizedModelManager":
         """
         Create a QuantizedModelManager from a saved quantized model checkpoint.
 
@@ -1797,9 +1792,7 @@ class PruneModelManager(ProfiledModelManager):
         self.updateConfigSparsity()
 
     def paramsToPrune(
-        self,
-        min_dims: Optional[int] = None,
-        conv_only: bool = False
+        self, min_dims: Optional[int] = None, conv_only: bool = False
     ) -> List[Tuple[torch.nn.Module, str]]:
         """
         Get list of parameters to prune.
@@ -1879,7 +1872,7 @@ class PruneModelManager(ProfiledModelManager):
         self.saveConfig()
 
     @staticmethod
-    def load(model_path: Path, gpu: int = -1) -> 'PruneModelManager':
+    def load(model_path: Path, gpu: int = -1) -> "PruneModelManager":
         """
         Create a PruneModelManager from a saved pruned model checkpoint.
 
@@ -1941,15 +1934,13 @@ class StructuredPruneModelManager(PruneModelManager):
         self.updateConfigSparsity()
 
     def paramsToPrune(
-        self,
-        min_dims: int = 2,
-        conv_only: bool = True
+        self, min_dims: int = 2, conv_only: bool = True
     ) -> List[Tuple[torch.nn.Module, str]]:
         # override superclass implementation and change default args
         return super().paramsToPrune(min_dims, conv_only)
 
     @staticmethod
-    def load(model_path: Path, gpu: int = -1) -> 'StructuredPruneModelManager':
+    def load(model_path: Path, gpu: int = -1) -> "StructuredPruneModelManager":
         """
         Create a StructuredPruneModelManager from a saved structured pruned model checkpoint.
 
@@ -1982,7 +1973,7 @@ class SurrogateModelManager(ModelManagerBase):
 
     Attributes:
         FOLDER_NAME (str): Name of the folder for surrogate models
-        victim_model (Union[VictimModelManager, PruneModelManager, QuantizedModelManager]): 
+        victim_model (Union[VictimModelManager, PruneModelManager, QuantizedModelManager]):
             The victim model being mimicked
         arch_pred_model_name (str): Name of the architecture prediction model used
         arch_confidence (float): Confidence score of architecture prediction
@@ -2143,7 +2134,7 @@ class SurrogateModelManager(ModelManagerBase):
         )
 
     @staticmethod
-    def load(model_path: str, gpu: int = -1) -> 'SurrogateModelManager':
+    def load(model_path: str, gpu: int = -1) -> "SurrogateModelManager":
         """
         Create a SurrogateModelManager from a saved surrogate model checkpoint.
 
@@ -2505,9 +2496,7 @@ class SurrogateModelManager(ModelManagerBase):
         return results
 
     def loadVictim(
-        self,
-        victim_model_path: str,
-        gpu: int
+        self, victim_model_path: str, gpu: int
     ) -> Union[VictimModelManager, PruneModelManager, QuantizedModelManager]:
         """
         Load the victim model based on its type.
@@ -2670,7 +2659,7 @@ def getModelsFromSurrogateTrainStrategies(
         },
     }
         architectures = ["resnet18", "googlenet"]
-        
+
         models = getModelsFromSurrogateTrainStrategies(
             strategies=strategies,
             architectures=architectures,

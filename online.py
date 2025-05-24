@@ -23,7 +23,7 @@ Example Usage:
     ```
 """
 
-from typing import Any, Dict, Iterable, Optional, Union
+from typing import Dict, Iterable, Optional, Union
 
 import numpy as np
 
@@ -70,11 +70,7 @@ class OnlineStats:
         # Sk = Sk-1 + (xk – Mk-1)*(xk – Mk)
         self.S += delta * (datum - self.mean)
 
-    def addN(
-        self,
-        iterable: Iterable[float],
-        batch: bool = False
-    ) -> None:
+    def addN(self, iterable: Iterable[float], batch: bool = False) -> None:
         """
         Add multiple data points to the running statistics.
 
@@ -156,7 +152,7 @@ class OnlineStats:
         return np.sqrt(self.flatvariance)
 
     @staticmethod
-    def from_values(n: int, mean: float, std: float) -> 'OnlineStats':
+    def from_values(n: int, mean: float, std: float) -> "OnlineStats":
         """
         Create an OnlineStats instance from pre-computed values.
 
@@ -175,7 +171,7 @@ class OnlineStats:
         return stats
 
     @staticmethod
-    def from_raw_values(n: int, mean: float, S: float) -> 'OnlineStats':
+    def from_raw_values(n: int, mean: float, S: float) -> "OnlineStats":
         """
         Create an OnlineStats instance from raw statistics.
 
@@ -203,10 +199,7 @@ class OnlineStats:
             + f"std={self.std})"
         )
 
-    def __add__(
-        self,
-        other: Union['OnlineStats', float, int]
-    ) -> 'OnlineStats':
+    def __add__(self, other: Union["OnlineStats", float, int]) -> "OnlineStats":
         """
         Add statistics or a constant to the current statistics.
 

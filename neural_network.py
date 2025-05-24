@@ -58,7 +58,7 @@ class Net(nn.Module):
         input_size: int,
         num_classes: int,
         hidden_layer_factor: Optional[float] = None,
-        layers: Optional[int] = None
+        layers: Optional[int] = None,
     ) -> None:
         """
         Initialize the neural network.
@@ -92,16 +92,10 @@ class Net(nn.Module):
         self.y_test = None
         self.accuracy = None
         self.scaler = None
-        self.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu"
-        )
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def construct_architecture(
-        self,
-        input_size: int,
-        hidden_layer_factor: float,
-        num_classes: int,
-        layers: int
+        self, input_size: int, hidden_layer_factor: float, num_classes: int, layers: int
     ) -> None:
         """
         Construct the network architecture.
@@ -136,7 +130,7 @@ class Net(nn.Module):
         self,
         x: Union[np.ndarray, pd.DataFrame],
         grad: bool = False,
-        normalize: bool = True
+        normalize: bool = True,
     ) -> torch.Tensor:
         """
         Get predictions for input data.
@@ -162,9 +156,7 @@ class Net(nn.Module):
         return torch.squeeze(output)
 
     def normalize(
-        self,
-        x: Union[np.ndarray, pd.DataFrame],
-        fit: bool = False
+        self, x: Union[np.ndarray, pd.DataFrame], fit: bool = False
     ) -> np.ndarray:
         """
         Normalize input data using standard scaling (x-u)/s.
@@ -206,8 +198,10 @@ class Net(nn.Module):
         y_test: Union[np.ndarray, pd.DataFrame],
         epochs: int = 100,
         lr: float = 0.1,
-        verbose: bool = True
-    ) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]], List[float], List[float]]:
+        verbose: bool = True,
+    ) -> Tuple[
+        List[Tuple[float, float]], List[Tuple[float, float]], List[float], List[float]
+    ]:
         """
         Train the network.
 

@@ -23,39 +23,30 @@ Example Usage:
 """
 
 import json
-import shutil
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import rc
-from tqdm import tqdm
 
 # Add parent directory to path for imports
 sys.path.append("../edge_profile")
 
 from architecture_prediction import (
-    ArchPredBase,
-    RFArchPred,
     arch_model_names,
     get_arch_pred_model,
 )
 from config import SYSTEM_SIGNALS
 from data_engineering import (
-    add_indicator_cols_to_input,
     all_data,
     filter_cols,
-    get_data_and_labels,
     remove_cols,
     removeColumnsFromOther,
-    shared_data,
 )
 from experiments import predictVictimArchs
-from format_profiles import parse_one_profile
-from utils import latest_file
 
 # Configure matplotlib settings
 rc("font", **{"family": "serif", "serif": ["Times"], "size": 14})
@@ -163,7 +154,9 @@ def generateReport(
 
     try:
         for i, num_features in enumerate(x_axis):
-            print(f"Running {num_experiments} experiments with {num_features} features.")
+            print(
+                f"Running {num_experiments} experiments with {num_features} features."
+            )
             new_features = feature_rank[:num_features]
             new_df = filter_cols(df, substrs=new_features)
             for model_name in model_names:
@@ -195,12 +188,18 @@ def generateReport(
 
         # Calculate statistics for each model
         for model_name in report:
-            report[model_name]["train_std"] = report[model_name]["train_acc"].std(axis=1)
-            report[model_name]["train_mean"] = report[model_name]["train_acc"].mean(axis=1)
+            report[model_name]["train_std"] = report[model_name]["train_acc"].std(
+                axis=1
+            )
+            report[model_name]["train_mean"] = report[model_name]["train_acc"].mean(
+                axis=1
+            )
             report[model_name]["val_std"] = report[model_name]["val_acc"].std(axis=1)
             report[model_name]["val_mean"] = report[model_name]["val_acc"].mean(axis=1)
             report[model_name]["test_std"] = report[model_name]["test_acc"].std(axis=1)
-            report[model_name]["test_mean"] = report[model_name]["test_acc"].mean(axis=1)
+            report[model_name]["test_mean"] = report[model_name]["test_acc"].mean(
+                axis=1
+            )
     except KeyboardInterrupt:
         pass
 

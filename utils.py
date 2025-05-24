@@ -24,7 +24,7 @@ Example Usage:
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 
 def timer(time_in_s: float) -> str:
@@ -66,11 +66,7 @@ def getSystem() -> str:
     return system
 
 
-def latest_file(
-    path: Path,
-    pattern: str = "*",
-    oldest: bool = False
-) -> Optional[Path]:
+def latest_file(path: Path, pattern: str = "*", oldest: bool = False) -> Optional[Path]:
     """
     Find the latest or oldest file in a directory matching a pattern.
 
@@ -87,7 +83,7 @@ def latest_file(
         ```python
         # Find latest JSON file
         latest = latest_file(Path("./data"), "*.json")
-        
+
         # Find oldest log file
         oldest = latest_file(Path("./logs"), "*.log", oldest=True)
         ```
@@ -152,6 +148,7 @@ def dict_to_str(dictionary: Dict[str, Any], indent: int = 4) -> str:
         # }
         ```
     """
+
     def default(x: Any) -> str:
         try:
             res = str(x)

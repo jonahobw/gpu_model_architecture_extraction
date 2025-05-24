@@ -24,7 +24,6 @@ Example Usage:
 
 import argparse
 import json
-import os
 import random
 import shlex
 import shutil
@@ -33,7 +32,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import List, Tuple, Optional, Union, Dict, Any
+from typing import Tuple
 
 import torch
 
@@ -44,11 +43,11 @@ from utils import dict_to_str, getSystem, latest_file
 
 def run_command(folder: Path, command: str) -> Tuple[bool, Path]:
     """Runs a command which is assumed to add a new profile to <folder>. Then validate the profile.
-    
+
     Args:
         folder: Directory where the profile will be saved
         command: Command to execute for profiling
-        
+
     Returns:
         Tuple of (is_valid_profile, profile_file_path)
     """
@@ -58,17 +57,16 @@ def run_command(folder: Path, command: str) -> Tuple[bool, Path]:
     return validProfile(profile_file), profile_file
 
 
-
 def generateExeName(use_exe: bool, use_tf: bool) -> str:
     """Generate the executable name based on configuration.
-    
+
     Args:
         use_exe: Whether to use compiled executable
         use_tf: Whether to use TensorFlow
-        
+
     Returns:
         Path to executable or Python command
-        
+
     Raises:
         AssertionError: If both use_exe and use_tf are True
     """

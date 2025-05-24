@@ -21,7 +21,7 @@ Example Usage:
 """
 
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np

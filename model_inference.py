@@ -31,7 +31,7 @@ Note:
 """
 
 import argparse
-from typing import Optional, Union
+from typing import Optional
 
 import torch
 
@@ -138,7 +138,9 @@ def load_model(
 def main() -> None:
     """Main execution function for model inference."""
     args = parse_args()
-    model, model_name = load_model(args.model, args.load_path, args.gpu, args.pretrained)
+    model, model_name = load_model(
+        args.model, args.load_path, args.gpu, args.pretrained
+    )
 
     # Set up device
     device = torch.device("cpu")

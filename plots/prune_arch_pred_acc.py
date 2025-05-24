@@ -29,16 +29,14 @@ import datetime
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import pandas as pd
-from sklearn.metrics import top_k_accuracy_score
 
 # Add parent directory to path for imports
 sys.path.append("../edge_profile")
 
 from architecture_prediction import (
-    ArchPredBase,
     arch_model_full_name,
     arch_model_names,
     get_arch_pred_model,
@@ -50,7 +48,6 @@ from data_engineering import (
     removeColumnsFromOther,
 )
 from experiments import predictVictimArchs
-from model_manager import VictimModelManager
 
 # Constants for file paths
 SAVE_FOLDER = Path(__file__).parent.absolute() / "prune_pred_acc"
@@ -142,12 +139,10 @@ def generatePruneReport(
         row_data = {
             "Architecture Prediction Model Type": arch_model_full_name()[model_type]
         }
-        
+
         # Train model
         model = get_arch_pred_model(
-            model_type=model_type,
-            df=quadro_train,
-            kwargs={"train_size": train_size}
+            model_type=model_type, df=quadro_train, kwargs={"train_size": train_size}
         )
         train_top1 = model.evaluateTrain() * 100
         row_data["Train"] = train_top1
@@ -188,9 +183,11 @@ if __name__ == "__main__":
     model_names = arch_model_names()
     topk = [1, 5]
     train_size = None  # Number of profiles to keep per architecture
-    feature_ranking_file = "rf_gpu_kernels_nomem.json" # None for all features
+    feature_ranking_file = "rf_gpu_kernels_nomem.json"  # None for all features
     feature_num = 25  # Number of features to use
-    df_args = {}  # Arguments for data loading, should be empty if feature_ranking_file is not None
+    df_args = (
+        {}
+    )  # Arguments for data loading, should be empty if feature_ranking_file is not None
     df_remove_substrs = []  # Substrings to remove from column names
 
     # ----------------------------------------------------------------------

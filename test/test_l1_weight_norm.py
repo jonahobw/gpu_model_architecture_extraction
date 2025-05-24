@@ -9,8 +9,11 @@ sys.path.append("../edge_profile")
 
 import torch
 
-from model_manager import (SurrogateModelManager, VictimModelManager,
-                           getVictimSurrogateModels)
+from model_manager import (
+    SurrogateModelManager,
+    VictimModelManager,
+    getVictimSurrogateModels,
+)
 from model_metrics import correct
 
 if __name__ == "__main__":

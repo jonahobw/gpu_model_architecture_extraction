@@ -27,7 +27,7 @@ Note:
 """
 
 import argparse
-from typing import Dict, Optional, Type, Union
+from typing import Dict, Type
 
 import numpy as np
 import tensorflow as tf
@@ -101,7 +101,9 @@ def main() -> None:
     # Validate GPU selection
     if args.gpu >= 0:
         gpus = tf.config.list_physical_devices("GPU")
-        assert args.gpu < len(gpus), f"GPU {args.gpu} not available. Found {len(gpus)} GPUs."
+        assert args.gpu < len(
+            gpus
+        ), f"GPU {args.gpu} not available. Found {len(gpus)} GPUs."
 
     # Enable device placement debugging if requested
     if args.debug:
@@ -111,14 +113,16 @@ def main() -> None:
     assert args.model in MODEL_MAP, f"Valid models are {list(MODEL_MAP.keys())}"
     model = MODEL_MAP[args.model]()
 
-    print(f"Running {args.n} inferences on {args.model} on {getDeviceName(args.gpu)}...")
+    print(
+        f"Running {args.n} inferences on {args.model} on {getDeviceName(args.gpu)}..."
+    )
 
     # Run inference
     with tf.device(getDeviceName(args.gpu)):
         # Create zero input tensor with shape (224, 224, 3)
         input_tensor = tf.constant(0.0, dtype=tf.float32, shape=(224, 224, 3))
         input_tensor = np.expand_dims(input_tensor, axis=0)
-        
+
         # Run inference
         output = model(input_tensor)
         print(f"Output class: {np.argmax(output)}")

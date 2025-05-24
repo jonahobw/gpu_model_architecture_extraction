@@ -20,12 +20,12 @@ import site
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 
 def createHiddenImportStr() -> str:
     """Create PyInstaller hidden imports string.
-    
+
     Returns:
         String containing all hidden imports for PyInstaller
     """
@@ -55,7 +55,7 @@ def createHiddenImportStr() -> str:
 
 def createAddDataStr() -> str:
     """Create PyInstaller add-data string for required packages.
-    
+
     Returns:
         String containing add-data arguments for PyInstaller
     """
@@ -70,7 +70,7 @@ def createAddDataStr() -> str:
 
 def createExcludeModsStr() -> str:
     """Create PyInstaller exclude-modules string.
-    
+
     Returns:
         String containing exclude-module arguments for PyInstaller
     """
@@ -83,12 +83,12 @@ def createExcludeModsStr() -> str:
 
 def create_exe() -> None:
     """Create executable using PyInstaller.
-    
+
     This function:
     1. Runs PyInstaller with necessary arguments
     2. Copies the executable to the appropriate platform-specific folder
     3. Handles both Windows and Linux paths
-    
+
     Raises:
         subprocess.CalledProcessError: If PyInstaller fails
         FileNotFoundError: If PyInstaller executable is not found
@@ -118,7 +118,7 @@ def create_exe() -> None:
 
 def cleanup() -> None:
     """Clean up temporary files created by PyInstaller.
-    
+
     Removes:
         - dist/ directory
         - build/ directory

@@ -143,6 +143,7 @@ def add_model_family(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Original DataFrame with added 'model_family' column
     """
+
     def label_family(row):
         return name_to_family[row["model"]]
 

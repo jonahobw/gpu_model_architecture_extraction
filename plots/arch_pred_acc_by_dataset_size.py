@@ -25,7 +25,7 @@ Example Usage:
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,7 +37,6 @@ sys.path.append("../edge_profile")
 
 from arch_pred_accuracy import getDF
 from architecture_prediction import arch_model_names, get_arch_pred_model
-from config import SYSTEM_SIGNALS
 from data_engineering import filter_cols
 from experiments import predictVictimArchs
 
@@ -142,7 +141,9 @@ def generateReport(
 
     # Run experiments for each dataset size
     for i, dataset_size in enumerate(x_axis):
-        print(f"Running {num_experiments} experiments with {dataset_size} dataset size.")
+        print(
+            f"Running {num_experiments} experiments with {dataset_size} dataset size."
+        )
         for model_name in model_names:
             kwargs = report[model_name]["kwargs"].copy()
             kwargs["train_size"] = dataset_size * len(df["model"].unique())

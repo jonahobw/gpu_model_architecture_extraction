@@ -26,13 +26,13 @@ import datetime
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import rc
-from sklearn.preprocessing import MinMaxScaler, Normalizer, StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 
 # Configure matplotlib settings
 rc("font", **{"family": "serif", "serif": ["Times"]})
@@ -41,7 +41,7 @@ rc("font", **{"family": "serif", "serif": ["Times"]})
 sys.path.append("../edge_profile")
 
 from data_engineering import all_data, filter_cols
-from get_model import all_models, model_families, name_to_family
+from get_model import model_families
 
 # Constants
 SAVE_FOLDER = Path(__file__).parent.absolute() / "top_n_features"

@@ -40,17 +40,20 @@ import shutil
 import time
 import traceback
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional
 
 import config
 from architecture_prediction import ArchPredBase, get_arch_pred_model
 from format_profiles import parse_one_profile
-from get_model import (all_models, getModelParams, name_to_family,
-                       quantized_models)
+from get_model import all_models, getModelParams, name_to_family, quantized_models
 from logger import CSVLogger
-from model_manager import (PruneModelManager, QuantizedModelManager,
-                           StructuredPruneModelManager, SurrogateModelManager,
-                           VictimModelManager)
+from model_manager import (
+    PruneModelManager,
+    QuantizedModelManager,
+    StructuredPruneModelManager,
+    SurrogateModelManager,
+    VictimModelManager,
+)
 from utils import dict_to_str, latest_file
 
 
@@ -59,17 +62,17 @@ def trainOneVictim(
     epochs: int = 150,
     gpu: int = -1,
     debug: Optional[int] = None,
-    save_model: bool = True
+    save_model: bool = True,
 ) -> VictimModelManager:
     """Train a single victim model.
-    
+
     Args:
         model_arch: Architecture name of the model to train
         epochs: Number of training epochs
         gpu: GPU device ID (-1 for CPU)
         debug: Debug level (None for no debugging)
         save_model: Whether to save the trained model
-        
+
     Returns:
         Trained VictimModelManager instance
     """
@@ -85,13 +88,10 @@ def trainOneVictim(
 
 
 def continueVictimTrain(
-    vict_path: Path,
-    epochs: int = 1,
-    gpu: int = -1,
-    debug: Optional[int] = None
+    vict_path: Path, epochs: int = 1, gpu: int = -1, debug: Optional[int] = None
 ) -> None:
     """Continue training a victim model from a saved checkpoint.
-    
+
     Args:
         vict_path: Path to the saved model
         epochs: Number of additional training epochs
@@ -111,7 +111,7 @@ def trainVictimModels(
     models: Optional[List[str]] = None,
 ) -> None:
     """Train multiple victim models with progress tracking.
-    
+
     Args:
         epochs: Number of training epochs per model
         gpu: GPU device ID (-1 for CPU)
@@ -122,7 +122,7 @@ def trainVictimModels(
     """
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     file_path = Path.cwd() / f"train_progress_{timestamp}.txt"
-    
+
     with open(file_path, "w") as f:
         if models is None:
             models = all_models
@@ -166,7 +166,7 @@ def profileAllVictimModels(
     add: bool = False,
 ) -> None:
     """Profile all victim models using NVIDIA profiler.
-    
+
     Args:
         gpu: GPU device ID
         prefix: Optional prefix to filter model paths
@@ -203,7 +203,7 @@ def trainSurrogateModels(
     data_idx: int = 1,
 ) -> None:
     """Train surrogate models based on victim models.
-    
+
     Args:
         epochs: List of epochs for each training stage
         patience: List of patience values for each stage
@@ -292,7 +292,7 @@ def runTransferSurrogateModels(
     debug: Optional[int] = None,
 ) -> None:
     """Run transfer attacks on surrogate models.
-    
+
     Args:
         prefix: Optional prefix to filter model paths
         gpu: GPU device ID
@@ -313,12 +313,9 @@ def runTransferSurrogateModels(
         )
 
 
-def quantizeVictimModels(
-    save: bool = True,
-    prefix: Optional[str] = None
-) -> None:
+def quantizeVictimModels(save: bool = True, prefix: Optional[str] = None) -> None:
     """Quantize victim models.
-    
+
     Args:
         save: Whether to save quantized models
         prefix: Optional prefix to filter model paths
@@ -338,7 +335,7 @@ def profileAllQuantizedModels(
     add: bool = False,
 ) -> None:
     """Profile all quantized models.
-    
+
     Args:
         gpu: GPU device ID
         prefix: Optional prefix to filter model paths
@@ -371,7 +368,7 @@ def pruneOneVictim(
     debug: Optional[int] = None,
 ) -> None:
     """Prune a single victim model.
-    
+
     Args:
         vict_path: Path to the victim model
         ratio: Pruning ratio
@@ -402,7 +399,7 @@ def pruneVictimModels(
     debug: Optional[int] = None,
 ) -> None:
     """Prune multiple victim models.
-    
+
     Args:
         prefix: Optional prefix to filter model paths
         ratio: Pruning ratio
@@ -429,7 +426,7 @@ def deletePrunedProfiles(
     structured: bool = False,
 ) -> None:
     """Delete profiles of pruned models.
-    
+
     Args:
         prefix: Optional prefix to filter model paths
         structured: Whether to handle structured pruning profiles
@@ -453,7 +450,7 @@ def profileAllPrunedModels(
     structured: bool = False,
 ) -> None:
     """Profile all pruned models.
-    
+
     Args:
         gpu: GPU device ID
         prefix: Optional prefix to filter model paths
@@ -489,13 +486,13 @@ def loadProfilesToFolder(
     Additionally creates a config json file where the keys are the paths to the profiles
     and the values are dicts of information about the profile such as path to actual profile,
     actual model architecture and architecture family, and model name.
-    
+
     Args:
         prefix: Prefix for model paths
         folder_name: Name of the folder to store profiles
         replace: Whether to replace existing profiles
-        filters: Optional filters for profile selection, must match the argument from the 
-            config file associated with a profile.  To get a profile by name, can specify 
+        filters: Optional filters for profile selection, must match the argument from the
+            config file associated with a profile.  To get a profile by name, can specify
             {"profile_number": "2181935"}.
         all: Whether to load all profiles or one per model
     """
@@ -549,7 +546,7 @@ def loadPrunedProfilesToFolder(
     structured: bool = False,
 ) -> None:
     """Same as loadProfilesToFolder, but for pruned models
-    
+
     Args:
         prefix: Prefix for model paths
         folder_name: Name of the folder to store profiles
@@ -618,7 +615,7 @@ def predictVictimArchs(
     Iterates through the profiles in <folder> which was generated
     by loadProfilesToFolder(), predicting the architecture of each, and storing
     a report in a json file called <name>.
-    
+
     Args:
         model: Architecture prediction model
         folder: Folder containing profiles
@@ -626,7 +623,7 @@ def predictVictimArchs(
         save: Whether to save predictions
         topk: Number of top predictions to consider
         verbose: Whether to print results
-        
+
     Returns:
         Dictionary containing prediction results and accuracy metrics
     """
@@ -703,7 +700,7 @@ def testKnockoffTrain(
     run_attack: bool = True,
 ) -> None:
     """Test knockoff nets training with different configurations.
-    
+
     Args:
         model_arch: Architecture of the model to test
         dataset: Dataset to use for training
@@ -828,7 +825,7 @@ def trainKnockoffSurrogateModels(
     times the default lr.  So if default is 0.1 and lr =
     [1, 0.5], then the lr will be 0.1*1 in the first stage
     and 0.1 * 0.5 in the second stage.
-    
+
     Args:
         dataset: Dataset to use for training
         transfer_size: Size of transfer set

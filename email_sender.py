@@ -37,25 +37,24 @@ Example Usage:
     ```
 """
 
-import json
 import ssl
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from smtplib import SMTP_SSL, SMTPException
-from typing import Callable, Dict, Optional, Union
+from smtplib import SMTP_SSL
+from typing import Callable, Dict, Optional
 
 from utils import dict_to_str, timer
 
 
 class EmailSender:
     """Email sender class for managing email communications.
-    
+
     This class handles email configuration and sending, with support for progress
     updates and notifications. It can be configured to either send emails or
     operate in a no-send mode for testing.
-    
+
     Attributes:
         sender: Email address of the sender
         reciever: Email address of the recipient
@@ -73,7 +72,7 @@ class EmailSender:
         **kwargs,
     ) -> None:
         """Initialize EmailSender.
-        
+
         Args:
             sender: Email address of the sender
             reciever: Email address of the recipient
@@ -87,7 +86,7 @@ class EmailSender:
         self.send = send
         if not self.send:
             print(f"Email settings: send set to {send}")
-            
+
         # Set up email function based on configuration
         if None in (sender, reciever, pw):
             print(
@@ -100,10 +99,10 @@ class EmailSender:
 
     def retrieve_pw(self, file: Optional[str] = None) -> Optional[str]:
         """Retrieve the Gmail password from a file.
-        
+
         Args:
             file: Path to the password file
-            
+
         Returns:
             Password string if file exists, None otherwise
         """
@@ -115,7 +114,7 @@ class EmailSender:
 
     def _email(self, subject: str, content: str = "") -> None:
         """Send an email using the configured settings.
-        
+
         Args:
             subject: Email subject line
             content: Email body content
@@ -139,7 +138,7 @@ class EmailSender:
         params: Dict = {},
     ) -> None:
         """Send a progress update email for iterative computational jobs.
-        
+
         This method sends an email with progress information including:
         - Number of iterations remaining
         - Completion percentage
@@ -147,9 +146,9 @@ class EmailSender:
         - Average time per iteration
         - Estimated time remaining
         - Additional parameters as JSON
-        
+
         Note: Assumes iterations start at 0, so adds 1 to account for this.
-        
+
         Args:
             start: Starting time of the entire job (from time.time())
             iter_start: Starting time of the last iteration (from time.time())
@@ -157,7 +156,7 @@ class EmailSender:
             total_iters: Total number of iterations
             subject: Email subject line
             params: Additional parameters to include in the email body
-            
+
         Raises:
             AssertionError: If iter is negative
         """
@@ -187,7 +186,7 @@ def email(
     send: bool = True,
 ) -> None:
     """Send an email via Gmail SMTP.
-    
+
     Args:
         content: Email body content
         subject: Email subject line
@@ -195,7 +194,7 @@ def email(
         reciever: Recipient's email address
         pw: Gmail password for the sender's account
         send: Whether to actually send the email
-        
+
     Raises:
         SMTPException: If there's an error connecting to the SMTP server
         Exception: For other email sending errors

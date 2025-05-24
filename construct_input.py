@@ -20,7 +20,7 @@ Example Usage:
     ```
 """
 
-from typing import Dict, Callable, Optional, Union
+from typing import Dict, Callable, Optional
 import torch
 
 import config
@@ -28,22 +28,22 @@ import config
 # Dictionary mapping input types to their corresponding tensor generation functions
 VALID_INPUTS: Dict[str, Callable] = {
     "random": torch.randn,  # Random normal distribution
-    "0": torch.zeros,      # Zero-filled tensor
-    "1": torch.ones,       # One-filled tensor
+    "0": torch.zeros,  # Zero-filled tensor
+    "1": torch.ones,  # One-filled tensor
 }
 
 
 def construct_input(type: str, number: int, seed: Optional[int] = None) -> torch.Tensor:
     """Construct an input tensor for model inference.
-    
+
     Args:
         type: Type of input to generate ('random', '0', or '1')
         number: Batch size (number of inputs to generate)
         seed: Optional random seed for reproducible random inputs
-        
+
     Returns:
         Tensor of shape (number, channels, input_size, input_size)
-        
+
     Raises:
         ValueError: If the input type is not one of the valid options
     """

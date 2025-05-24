@@ -33,15 +33,16 @@ from typing import Dict, List, Optional, Set, Union
 
 import pandas as pd
 
-# plt.style.use('ggplot')
-
 # setting path
 sys.path.append("../edge_profile")
 
-from architecture_prediction import (ArchPredBase, arch_model_full_name,
-                                     arch_model_names, get_arch_pred_model)
-from data_engineering import (all_data, filter_cols, remove_cols,
-                              removeColumnsFromOther)
+from architecture_prediction import (
+    ArchPredBase,
+    arch_model_full_name,
+    arch_model_names,
+    get_arch_pred_model,
+)
+from data_engineering import all_data, filter_cols, remove_cols, removeColumnsFromOther
 from experiments import predictVictimArchs
 from model_manager import VictimModelManager
 

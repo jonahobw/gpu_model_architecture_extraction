@@ -32,7 +32,7 @@ import datetime
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -43,7 +43,7 @@ from matplotlib import rc
 sys.path.append("../edge_profile")
 
 from arch_pred_accuracy import getDF
-from architecture_prediction import arch_model_names, get_arch_pred_model
+from architecture_prediction import get_arch_pred_model
 from data_engineering import filter_cols
 
 # Configure matplotlib settings
@@ -130,12 +130,12 @@ def generateReport(
         for experiment in range(num_experiments):
             # Create copies for different adversary models
             df_experiment = df.copy(deep=True)  # Unaware adversary
-            df_aware5 = df.copy(deep=True)      # Aware adversary (5 samples)
-            df_aware10 = df.copy(deep=True)     # Aware adversary (10 samples)
-            df_aware25 = df.copy(deep=True)     # Aware adversary (25 samples)
-            df_sub5 = df.copy(deep=True)        # Subtraction adversary (5 samples)
-            df_sub10 = df.copy(deep=True)       # Subtraction adversary (10 samples)
-            df_sub25 = df.copy(deep=True)       # Subtraction adversary (25 samples)
+            df_aware5 = df.copy(deep=True)  # Aware adversary (5 samples)
+            df_aware10 = df.copy(deep=True)  # Aware adversary (10 samples)
+            df_aware25 = df.copy(deep=True)  # Aware adversary (25 samples)
+            df_sub5 = df.copy(deep=True)  # Subtraction adversary (5 samples)
+            df_sub10 = df.copy(deep=True)  # Subtraction adversary (10 samples)
+            df_sub25 = df.copy(deep=True)  # Subtraction adversary (25 samples)
 
             # Add noise if noise level > 0
             if noise_level > 0.0:
@@ -163,8 +163,12 @@ def generateReport(
                     # Aware adversary: Average noise and subtract expected value
                     expected_val = (noise_level * std) / 2 + const
                     df_aware5[noise_feature] += min_noise_5.mean(axis=1) - expected_val
-                    df_aware10[noise_feature] += min_noise_10.mean(axis=1) - expected_val
-                    df_aware25[noise_feature] += min_noise_25.mean(axis=1) - expected_val
+                    df_aware10[noise_feature] += (
+                        min_noise_10.mean(axis=1) - expected_val
+                    )
+                    df_aware25[noise_feature] += (
+                        min_noise_25.mean(axis=1) - expected_val
+                    )
 
                     # Subtraction adversary: Use minimum noise
                     df_sub5[noise_feature] += min_noise_5.min(axis=1)
@@ -179,9 +183,15 @@ def generateReport(
 
                 # Aware adversary (averaging)
                 aware_model = get_arch_pred_model(model_name, df=df)
-                noise_config_aware5[model_name].append(aware_model.evaluateAcc(df_aware5))
-                noise_config_aware10[model_name].append(aware_model.evaluateAcc(df_aware10))
-                noise_config_aware25[model_name].append(aware_model.evaluateAcc(df_aware25))
+                noise_config_aware5[model_name].append(
+                    aware_model.evaluateAcc(df_aware5)
+                )
+                noise_config_aware10[model_name].append(
+                    aware_model.evaluateAcc(df_aware10)
+                )
+                noise_config_aware25[model_name].append(
+                    aware_model.evaluateAcc(df_aware25)
+                )
 
                 # Aware adversary (subtraction)
                 noise_config_subtract5[model_name].append(model.evaluateAcc(df_sub5))
@@ -230,7 +240,7 @@ def plotFromReport(report_path: Path, arch_model_names: List[str]) -> None:
 
         # Plot mean accuracy
         plt.plot(report["noise_levels"], model_avgs, label=model_name)
-        
+
         # Add standard deviation bands
         minus_std = [mean - std for mean, std in zip(model_avgs, model_stds)]
         plus_std = [mean + std for mean, std in zip(model_avgs, model_stds)]

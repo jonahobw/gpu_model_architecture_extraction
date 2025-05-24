@@ -16,7 +16,6 @@ Example Usage:
 """
 
 import argparse
-from typing import Optional, Union
 
 import pyprof
 import torch
@@ -82,21 +81,17 @@ def main() -> None:
         type=str,
         default="resnet",
         required=False,
-        help="Model architecture to profile (resnet, googlenet, mobilenetv3, vgg)"
+        help="Model architecture to profile (resnet, googlenet, mobilenetv3, vgg)",
     )
     parser.add_argument(
-        "-n",
-        type=int,
-        default=10,
-        required=False,
-        help="Number of inferences to run"
+        "-n", type=int, default=10, required=False, help="Number of inferences to run"
     )
     parser.add_argument(
         "-gpu",
         type=int,
         default=-1,
         required=False,
-        help="GPU device to use (-1 for CPU, else GPU number)"
+        help="GPU device to use (-1 for CPU, else GPU number)",
     )
 
     args = parser.parse_args()

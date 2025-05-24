@@ -11,8 +11,11 @@ from pathlib import Path
 # setting path
 sys.path.append("../edge_profile")
 
-from model_manager import (SurrogateModelManager, VictimModelManager,
-                           getVictimSurrogateModels)
+from model_manager import (
+    SurrogateModelManager,
+    VictimModelManager,
+    getVictimSurrogateModels,
+)
 
 
 def addConfig(args: dict):

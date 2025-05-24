@@ -44,7 +44,7 @@ from torchvision.datasets import VisionDataset
 
 def nameToDataset() -> Dict[str, Callable]:
     """Get mapping of dataset names to their loader functions.
-    
+
     Returns:
         Dictionary mapping dataset names to their respective dataset classes
     """
@@ -59,17 +59,22 @@ def nameToDataset() -> Dict[str, Callable]:
 
 class TinyImageNet200(datasets.ImageFolder):
     """Dataset class for TinyImageNet-200.
-    
+
     This class extends ImageFolder to handle the TinyImageNet-200 dataset,
     Adapted from https://github.com/tribhuvanesh/knockoffnets
-    
+
     Args:
         root: Root directory of the dataset
         train: If True, loads training data, else validation data
         transform: Optional transform to apply to images
     """
 
-    def __init__(self, root: Union[str, Path], train: bool = True, transform: Optional[Callable] = None):
+    def __init__(
+        self,
+        root: Union[str, Path],
+        train: bool = True,
+        transform: Optional[Callable] = None,
+    ):
         root = Path(root) / "train" if train else "val"
         super().__init__(root=root, transform=transform)
         self.root = root
@@ -77,7 +82,7 @@ class TinyImageNet200(datasets.ImageFolder):
 
     def _load_meta(self) -> None:
         """Replace class names (synsets) with more descriptive labels.
-        
+
         Loads the words.txt file to map synset IDs to human-readable class names.
         """
         synset_to_desc = dict()
@@ -94,14 +99,14 @@ class TinyImageNet200(datasets.ImageFolder):
 
 def dataset_path(dataset: str, path: Optional[str] = None) -> Path:
     """Get the path to a specified dataset.
-    
+
     Args:
         dataset: Name of the dataset (MNIST, CIFAR10, CIFAR100, ImageNet)
         path: Semicolon-separated list of paths to look for dataset folders
-        
+
     Returns:
         Path to the dataset directory
-        
+
     Raises:
         ValueError: If no path is provided and DATAPATH is not set
         LookupError: If the dataset cannot be found in any of the provided paths
@@ -127,10 +132,10 @@ def dataset_builder(
     normalize: Optional[transforms.Normalize] = None,
     preproc: Optional[List[transforms.Transform]] = None,
     path: Optional[str] = None,
-    resize: Optional[int] = None
+    resize: Optional[int] = None,
 ) -> VisionDataset:
     """Build a dataset with proper preprocessing.
-    
+
     Args:
         dataset: Name of the dataset
         train: Whether to return training or validation set
@@ -138,7 +143,7 @@ def dataset_builder(
         preproc: List of preprocessing operations
         path: Semicolon-separated list of paths to look for dataset folders
         resize: Optional size to resize images to
-        
+
     Returns:
         Dataset object with transforms and normalization
     """
@@ -168,13 +173,13 @@ def MNIST(
     normalize: Optional[Tuple[List[float], List[float]]] = None,
 ) -> VisionDataset:
     """Create MNIST dataset with preprocessing.
-    
+
     Args:
         train: Whether to return training or validation set
         path: Path to dataset directory
         resize: Optional size to resize images to
         normalize: Optional (mean, std) for normalization
-        
+
     Returns:
         MNIST dataset with specified preprocessing
     """
@@ -193,14 +198,14 @@ def CIFAR10(
     normalize: Optional[Tuple[List[float], List[float]]] = None,
 ) -> VisionDataset:
     """Create CIFAR10 dataset with preprocessing.
-    
+
     Args:
         train: Whether to return training or validation set
         path: Path to dataset directory
         deterministic: If True, disable data augmentation
         resize: Optional size to resize images to
         normalize: Optional (mean, std) for normalization
-        
+
     Returns:
         CIFAR10 dataset with specified preprocessing
     """
@@ -225,14 +230,14 @@ def CIFAR100(
     deterministic: bool = False,
 ) -> VisionDataset:
     """Create CIFAR100 dataset with preprocessing.
-    
+
     Args:
         train: Whether to return training or validation set
         path: Path to dataset directory
         resize: Optional size to resize images to
         normalize: Optional (mean, std) for normalization
         deterministic: If True, disable data augmentation
-        
+
     Returns:
         CIFAR100 dataset with specified preprocessing
     """
@@ -259,14 +264,14 @@ def TinyImageNet(
     deterministic: bool = False,
 ) -> VisionDataset:
     """Create TinyImageNet dataset with preprocessing.
-    
+
     Args:
         train: Whether to return training or validation set
         path: Path to dataset directory
         resize: Optional size to resize images to
         normalize: Optional (mean, std) for normalization
         deterministic: If True, disable data augmentation
-        
+
     Returns:
         TinyImageNet dataset with specified preprocessing
     """
@@ -293,18 +298,19 @@ def ImageNet(
     deterministic: bool = False,
 ) -> VisionDataset:
     """Create ImageNet dataset with preprocessing.
-    
+
     Args:
         train: Whether to return training or validation set
         path: Path to dataset directory
         resize: Optional size to resize images to
         normalize: Optional (mean, std) for normalization
         deterministic: If True, disable data augmentation
-        
+
     Returns:
         ImageNet dataset with specified preprocessing
     """
     import warnings
+
     warnings.filterwarnings("ignore", "(Possibly )?corrupt EXIF data", UserWarning)
 
     mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
@@ -324,10 +330,10 @@ def ImageNet(
 
 class Dataset:
     """Dataset class for managing data loading and preprocessing.
-    
+
     This class provides a unified interface for loading and preprocessing datasets,
     with support for lazy loading, data subsetting, and custom preprocessing.
-    
+
     Attributes:
         name_mapping: Dictionary mapping dataset names to their loader functions
         num_classes_map: Dictionary mapping dataset names to their number of classes
@@ -363,7 +369,7 @@ class Dataset:
         deterministic: bool = False,
     ) -> None:
         """Initialize Dataset.
-        
+
         Args:
             dataset: Name of the dataset to load
             batch_size: Batch size for data loaders
@@ -422,7 +428,7 @@ class Dataset:
     @property
     def train_data(self) -> Union[VisionDataset, Subset]:
         """Get training dataset.
-        
+
         Returns:
             Training dataset with specified preprocessing
         """
@@ -448,7 +454,7 @@ class Dataset:
     @property
     def train_dl(self) -> DataLoader:
         """Get training data loader.
-        
+
         Returns:
             DataLoader for training data
         """
@@ -466,7 +472,7 @@ class Dataset:
     @property
     def val_data(self) -> Union[VisionDataset, Subset]:
         """Get validation dataset.
-        
+
         Returns:
             Validation dataset with specified preprocessing
         """
@@ -493,7 +499,7 @@ class Dataset:
     @property
     def val_dl(self) -> DataLoader:
         """Get validation data loader.
-        
+
         Returns:
             DataLoader for validation data
         """
@@ -511,7 +517,7 @@ class Dataset:
     @property
     def train_acc_data(self) -> Union[VisionDataset, Subset]:
         """Get training dataset for accuracy computation.
-        
+
         Returns:
             Training dataset with deterministic preprocessing
         """
@@ -535,7 +541,7 @@ class Dataset:
     @property
     def train_acc_dl(self) -> DataLoader:
         """Get training data loader for accuracy computation.
-        
+
         Returns:
             DataLoader for training data with deterministic preprocessing
         """
@@ -554,11 +560,11 @@ class Dataset:
         self, dataset: Union[VisionDataset, Subset], show: bool = True
     ) -> Dict[int, int]:
         """Compute class balance statistics for a dataset.
-        
+
         Args:
             dataset: Dataset to analyze
             show: If True, print the class distribution
-            
+
         Returns:
             Dictionary mapping class indices to their counts
         """
@@ -580,7 +586,7 @@ def datasetPartition(
     resize: Optional[int] = None,
 ) -> List[Dataset]:
     """Create two datasets from a single dataset with different splits.
-    
+
     Args:
         dataset: Name of the dataset to load
         batch_size: Batch size for data loaders
@@ -588,7 +594,7 @@ def datasetPartition(
         data_subset_percent: Percentage of data to use (splits into two portions)
         seed: Random seed for reproducibility
         resize: Optional size to resize images to
-        
+
     Returns:
         List of two Dataset objects with different data splits
     """

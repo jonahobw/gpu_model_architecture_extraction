@@ -26,8 +26,6 @@ Example Usage:
     df = all_data("profiles_folder", indicators_only=True)
     ```
 """
-import json
-from pathlib import Path
 from typing import Dict, List, Tuple, Union, Optional
 
 import numpy as np
@@ -39,25 +37,27 @@ from format_profiles import read_csv
 
 def subsample(df: pd.DataFrame, num: int, col: str = "model") -> pd.DataFrame:
     """Return a dataframe with the first n rows from each value in specified column.
-    
+
     Args:
         df: Input DataFrame
         num: Number of rows to sample per group
         col: Column to group by (default: "model")
-        
+
     Returns:
         DataFrame with n rows per group from specified column
     """
     return df.groupby(col).head(num).reset_index(drop=True).copy(deep=True)
 
 
-def removeColumnsFromOther(keep_cols: pd.DataFrame, remove_df: pd.DataFrame) -> pd.DataFrame:
+def removeColumnsFromOther(
+    keep_cols: pd.DataFrame, remove_df: pd.DataFrame
+) -> pd.DataFrame:
     """Remove columns from remove_df that are not present in keep_cols.
-    
+
     Args:
         keep_cols: DataFrame containing columns to keep
         remove_df: DataFrame to remove columns from
-        
+
     Returns:
         DataFrame with only columns present in keep_cols
     """
@@ -67,10 +67,10 @@ def removeColumnsFromOther(keep_cols: pd.DataFrame, remove_df: pd.DataFrame) -> 
 
 def softmax(x: np.ndarray) -> np.ndarray:
     """Compute softmax values for each set of scores in x.
-    
+
     Args:
         x: Input array of scores
-        
+
     Returns:
         Array of softmax probabilities
     """
@@ -78,19 +78,19 @@ def softmax(x: np.ndarray) -> np.ndarray:
 
 
 def remove_cols(
-    df: pd.DataFrame, 
-    substrs: Union[str, List[str]], 
-    endswith: bool = False, 
-    verbose: bool = False
+    df: pd.DataFrame,
+    substrs: Union[str, List[str]],
+    endswith: bool = False,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """Remove columns containing (or ending with) specified substrings.
-    
+
     Args:
         df: Input DataFrame
         substrs: String or list of strings to match in column names
         endswith: If True, match end of column names instead of anywhere
         verbose: If True, print removed column names
-        
+
     Returns:
         DataFrame with matching columns removed
     """
@@ -116,19 +116,19 @@ def remove_cols(
 
 
 def filter_cols(
-    df: pd.DataFrame, 
-    substrs: List[str], 
-    keep: Optional[List[str]] = None, 
-    verbose: bool = False
+    df: pd.DataFrame,
+    substrs: List[str],
+    keep: Optional[List[str]] = None,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """Keep only columns containing specified substrings.
-    
+
     Args:
         df: Input DataFrame
         substrs: List of strings to match in column names
         keep: List of column names to always keep (default: ["model", "model_family", "file"])
         verbose: If True, print removed column names
-        
+
     Returns:
         DataFrame with only matching columns
     """
@@ -157,16 +157,16 @@ def get_csv(
     aggregated_csv_folder: str,
     remove_nans: bool = True,
     gpu_activities_only: bool = False,
-    api_calls_only: bool = False
+    api_calls_only: bool = False,
 ) -> pd.DataFrame:
     """Read and preprocess aggregated CSV data.
-    
+
     Args:
         aggregated_csv_folder: Path to folder containing aggregated.csv
         remove_nans: If True, remove columns containing NaN values
         gpu_activities_only: If True, keep only GPU activity columns
         api_calls_only: If True, keep only API call columns
-        
+
     Returns:
         Processed DataFrame
     """
@@ -183,15 +183,15 @@ def get_csv(
 def missing_data(
     aggregated_csv_folder: str,
     gpu_activities_only: bool = False,
-    api_calls_only: bool = False
+    api_calls_only: bool = False,
 ) -> Dict[str, pd.Series]:
     """Get missing data statistics by model.
-    
+
     Args:
         aggregated_csv_folder: Path to folder containing aggregated.csv
         gpu_activities_only: If True, analyze only GPU activity columns
         api_calls_only: If True, analyze only API call columns
-        
+
     Returns:
         Dictionary mapping models to Series of missing data percentages by column in the aggregated csv.
     """
@@ -214,15 +214,15 @@ def missing_data(
 def mutually_exclusive_data(
     aggregated_csv_folder: str,
     gpu_activities_only: bool = False,
-    api_calls_only: bool = False
+    api_calls_only: bool = False,
 ) -> Dict[str, Union[Dict[str, List[str]], List[str]]]:
     """Analyze feature completeness and exclusivity across models.
-    
+
     Args:
         aggregated_csv_folder: Path to folder containing aggregated.csv
         gpu_activities_only: If True, analyze only GPU activity columns
         api_calls_only: If True, analyze only API call columns
-        
+
     Returns:
         Dictionary containing:
         - mutually_exclusive_attributes: the attributes which are exclusive to each model.  Only include an attribute
@@ -288,20 +288,20 @@ def shared_data(
     system_data_only: bool = False,
     no_system_data: bool = False,
     gpu_activities_only: bool = False,
-    api_calls_only: bool = False
+    api_calls_only: bool = False,
 ) -> pd.DataFrame:
     """Get complete features suitable for machine learning.
-    
+
     Args:
         agg_csv_folder: Path to folder containing aggregated.csv
         system_data_only: If True, keep only system metrics
         no_system_data: If True, exclude system metrics
         gpu_activities_only: If True, keep only GPU activity columns
         api_calls_only: If True, keep only API call columns
-        
+
     Returns:
         DataFrame with complete features
-        
+
     Raises:
         ValueError: If both system_data_only and no_system_data are True
     """
@@ -338,13 +338,15 @@ def shared_data(
     return df.drop(system_cols, axis=1)
 
 
-def train_test_split(df: pd.DataFrame, ratio: float = 0.8) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def train_test_split(
+    df: pd.DataFrame, ratio: float = 0.8
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Split data into train and test sets with balanced class representation.
-    
+
     Args:
         df: Input DataFrame
         ratio: Train/test split ratio (default: 0.8)
-        
+
     Returns:
         Tuple of (train_df, test_df)
     """
@@ -364,17 +366,15 @@ def train_test_split(df: pd.DataFrame, ratio: float = 0.8) -> Tuple[pd.DataFrame
 
 
 def get_data_and_labels(
-    df: pd.DataFrame,
-    shuffle: bool = True,
-    label: Optional[str] = None
+    df: pd.DataFrame, shuffle: bool = True, label: Optional[str] = None
 ) -> Tuple[pd.DataFrame, pd.Series]:
     """Split DataFrame into features and labels.
-    
+
     Args:
         df: Input DataFrame
         shuffle: If True, shuffle the data
         label: Column to use as label (default: "model")
-        
+
     Returns:
         Tuple of (features, labels)
     """
@@ -393,17 +393,17 @@ def get_data_and_labels(
 
 def add_indicator_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Add binary indicator columns for missing values.
-    
+
     For each column with NaN values, adds a binary indicator column and fills
     missing values with the mean. Since GPU data is split into 6 features (min, max,
     avg, num_calls, time_ms, time_percent), only 1 indicator column is added instead of 6.
-    
+
     Args:
         df: Input DataFrame
-        
+
     Returns:
         DataFrame with indicator columns and filled missing values
-        
+
     Raises:
         RuntimeError: If NaN values remain after processing
     """
@@ -419,7 +419,7 @@ def add_indicator_columns(df: pd.DataFrame) -> pd.DataFrame:
     def stripPrefix(col_name: str) -> str:
         for prefix in prefixes:
             if col_name.startswith(prefix):
-                return col_name[len(prefix):]
+                return col_name[len(prefix) :]
         raise ValueError
 
     for col in df.columns:
@@ -438,9 +438,7 @@ def add_indicator_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_indicator_cols_to_input(
-    df: pd.DataFrame,
-    x: pd.Series,
-    exclude: List[str] = []
+    df: pd.DataFrame, x: pd.Series, exclude: List[str] = []
 ) -> pd.Series:
     """Modify input data columns to match reference DataFrame.
 
@@ -448,12 +446,12 @@ def add_indicator_cols_to_input(
     - Fills missing values in the input data with the mean of the column.
     - Drops columns from the input data that are not in the reference DataFrame.
     - Excludes columns from the input data that are in the exclude list.
-    
+
     Args:
         df: Reference DataFrame
         x: Input Series to process
         exclude: List of columns to exclude
-        
+
     Returns:
         Processed Series with matching columns and indicators
     """
@@ -498,10 +496,10 @@ def all_data(
     no_system_data: bool = False,
     indicators_only: bool = False,
     gpu_activities_only: bool = False,
-    api_calls_only: bool = False
+    api_calls_only: bool = False,
 ) -> pd.DataFrame:
     """Get all features with indicator columns for missing values.
-    
+
     Args:
         agg_csv_folder: Path to folder containing aggregated.csv
         system_data_only: If True, keep only system metrics
@@ -509,10 +507,10 @@ def all_data(
         indicators_only: If True, keep only indicator columns
         gpu_activities_only: If True, keep only GPU activity columns
         api_calls_only: If True, keep only API call columns
-        
+
     Returns:
         Processed DataFrame
-        
+
     Raises:
         ValueError: If both system_data_only and no_system_data are True
         ValueError: If both indicators_only and system_data_only are True

@@ -32,7 +32,7 @@ Note:
 
 import torch
 import torchvision.models as models
-from typing import Dict, List, Tuple, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 
 # Model family definitions with their variants
 alexnet = "alexnet", ["alexnet"]
@@ -161,7 +161,7 @@ def get_model(
         If pretrained is True, kwargs are not passed to the model constructor
         to ensure compatibility with pre-trained weights.
     """
-        
+
     model_arch = model_arch.lower()
     if model_arch not in name_to_family:
         raise ValueError(f"Model {model_arch} not supported")
