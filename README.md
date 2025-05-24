@@ -1,9 +1,7 @@
 # A Model Extraction Attack on Deep Neural Networks Running on GPUs
 Code for the theiss: [A Model Extraction Attack on Deep Neural Networks Running on GPUs](https://doi.org/10.7275/35614344)
 
-By Jonah O'Brien Weiss
-
-[jonahobw.github.io](jonahobw.github.io)
+By [Jonah O'Brien Weiss](https://jonahobw.github.io)
 
 This repo contains code automating large scale experiments to:
 - Train deep neural networks (DNNs) in Pytorch
